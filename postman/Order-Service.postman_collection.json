@@ -1,0 +1,37 @@
+{
+  "info": {
+    "name": "Car Sales - Order Service",
+    "description": "Read/manage the authenticated customer's cart and read owned orders. Obtain tokens from Auth; all data is real database data. Vehicle-dependent writes are intentionally not included until a vehicle API exists.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "orderBaseUrl", "value": "http://localhost:8083" },
+    { "key": "customerBaseUrl", "value": "http://localhost:8082" },
+    { "key": "customerToken", "value": "" },
+    { "key": "otherCustomerToken", "value": "" },
+    { "key": "orderId", "value": "1" },
+    { "key": "otherOrderId", "value": "1" },
+    { "key": "vehicleId", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "Cart",
+      "item": [
+        { "name": "Get or create my active cart", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{orderBaseUrl}}/api/v1/me/cart" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('active cart returned', () => pm.response.to.have.status(200));", "pm.test('active status', () => pm.expect(pm.response.json().data.status).to.eql('ACTIVE'));"] } }] },
+        { "name": "Remove vehicle from my cart", "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{orderBaseUrl}}/api/v1/me/cart/items/{{vehicleId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('removed or absent', () => pm.expect([200,404]).to.include(pm.response.code));"] } }] },
+        { "name": "Clear my cart", "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{orderBaseUrl}}/api/v1/me/cart/items" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('cart cleared', () => pm.response.to.have.status(200));"] } }] },
+        { "name": "Unauthenticated cart is rejected", "request": { "method": "GET", "url": "{{orderBaseUrl}}/api/v1/me/cart" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('missing JWT rejected', () => pm.response.to.have.status(401));"] } }] }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        { "name": "List my orders", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{orderBaseUrl}}/api/v1/me/orders" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('own orders returned', () => pm.response.to.have.status(200));"] } }] },
+        { "name": "Get my order", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{orderBaseUrl}}/api/v1/me/orders/{{orderId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('owned order returned', () => pm.response.to.have.status(200));"] } }] },
+        { "name": "Get my order status history", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{orderBaseUrl}}/api/v1/me/orders/{{orderId}}/history" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('owned order history returned', () => pm.response.to.have.status(200));"] } }] },
+        { "name": "Foreign order is hidden", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{orderBaseUrl}}/api/v1/me/orders/{{otherOrderId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('foreign order hidden', () => pm.response.to.have.status(404));"] } }] },
+        { "name": "Invalid or expired JWT is rejected", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer invalid.token.value" }], "url": "{{orderBaseUrl}}/api/v1/me/orders" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('invalid JWT rejected', () => pm.response.to.have.status(401));"] } }] }
+      ]
+    }
+  ]
+}
