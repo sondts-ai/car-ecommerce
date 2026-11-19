@@ -12,7 +12,10 @@ database/
 ├── customer_db/
 │   ├── schema.sql
 │   └── seed.sql
-├── vehicle_db/
+├── car_db/
+│   ├── schema.sql
+│   └── seed.sql
+├── inventory_db/
 │   ├── schema.sql
 │   └── seed.sql
 ├── order_db/
@@ -39,8 +42,11 @@ mysql -h127.0.0.1 -P3306 -ucar_app -p < database/auth_db/seed.sql
 mysql -h127.0.0.1 -P3306 -ucar_app -p < database/customer_db/schema.sql
 mysql -h127.0.0.1 -P3306 -ucar_app -p < database/customer_db/seed.sql
 
-mysql -h127.0.0.1 -P3306 -ucar_app -p < database/vehicle_db/schema.sql
-mysql -h127.0.0.1 -P3306 -ucar_app -p < database/vehicle_db/seed.sql
+mysql -h127.0.0.1 -P3306 -ucar_app -p < database/car_db/schema.sql
+mysql -h127.0.0.1 -P3306 -ucar_app -p < database/car_db/seed.sql
+
+mysql -h127.0.0.1 -P3306 -ucar_app -p < database/inventory_db/schema.sql
+mysql -h127.0.0.1 -P3306 -ucar_app -p < database/inventory_db/seed.sql
 
 mysql -h127.0.0.1 -P3306 -ucar_app -p < database/order_db/schema.sql
 mysql -h127.0.0.1 -P3306 -ucar_app -p < database/order_db/seed.sql
@@ -60,7 +66,7 @@ Các file dùng `CREATE ... IF NOT EXISTS` và `INSERT IGNORE` nên có thể ch
 | Port | `3306` |
 | User ứng dụng | `car_app` |
 | Password | `CarApp@123` |
-| Database | `auth_db`, `customer_db`, `vehicle_db`, `order_db`, `payment_db` |
+| Database | `auth_db`, `customer_db`, `car_db`, `inventory_db`, `order_db`, `payment_db` |
 
 Tạo user ứng dụng (chạy bằng tài khoản admin MySQL):
 
@@ -68,7 +74,8 @@ Tạo user ứng dụng (chạy bằng tài khoản admin MySQL):
 CREATE USER IF NOT EXISTS 'car_app'@'%' IDENTIFIED BY 'CarApp@123';
 GRANT ALL PRIVILEGES ON auth_db.*     TO 'car_app'@'%';
 GRANT ALL PRIVILEGES ON customer_db.* TO 'car_app'@'%';
-GRANT ALL PRIVILEGES ON vehicle_db.*  TO 'car_app'@'%';
+GRANT ALL PRIVILEGES ON car_db.*       TO 'car_app'@'%';
+GRANT ALL PRIVILEGES ON inventory_db.* TO 'car_app'@'%';
 GRANT ALL PRIVILEGES ON order_db.*    TO 'car_app'@'%';
 GRANT ALL PRIVILEGES ON payment_db.*  TO 'car_app'@'%';
 FLUSH PRIVILEGES;
@@ -97,42 +104,45 @@ FLUSH PRIVILEGES;
 - Ràng buộc mỗi khách chỉ có **1 địa chỉ mặc định** bằng generated column + UNIQUE.
 - `customers.user_id` là tham chiếu logic xuyên service (không tạo FK vật lý).
 
-### C. `vehicle_db` – Vehicle Service (11 bảng)
+### C. `car_db` – Car Service (6 bảng)
 
-**Nhóm 1 – Danh mục xe**
-
-| Bảng | Cột chính |
-|---|---|
-| `brands` | `id`, `name`, `logo_url`, `description` |
-| `car_models` | `id`, `brand_id` (FK), `name`, `description` |
-| `car_versions` | `id`, `model_id` (FK), `version_name`, `engine`, `transmission`, `fuel_type`, `seats` |
-| `categories` | `id`, `name`, `description` |
-| `car_model_categories` | `model_id` + `category_id` (N–N) |
-
-**Nhóm 2 – Từng chiếc xe**
+Danh mục xe (tách ra từ `vehicle_db` cũ).
 
 | Bảng | Cột chính |
 |---|---|
-| `vehicles` | `id`, `version_id` (FK), `vin` (UNIQUE), `license_plate`, `condition`, `year`, `color`, `mileage`, `price`, `description`, `status` |
-| `vehicle_images` | `id`, `vehicle_id` (FK), `image_url`, `is_thumbnail`, `sort_order` |
-| `vehicle_documents` | `id`, `vehicle_id` (FK), `document_type`, `file_url` |
+| `brands` | `id`, `name` (UNIQUE), `logo_url`, `description` |
+| `categories` | `id`, `name` (UNIQUE), `description` |
+| `car_models` | `id`, `brand_id` (FK RESTRICT), `name`, `description`; UNIQUE (`brand_id`, `name`) |
+| `car_versions` | `id`, `model_id` (FK), `version_name`, `engine`, `transmission`, `fuel_type`, `seats` (2–60); UNIQUE (`model_id`, `version_name`) |
+| `car_model_categories` | `model_id` + `category_id` (PK kép, N–N) |
+| `car_images` | `id`, `model_id` (FK CASCADE), `image_url`, `is_thumbnail`, `sort_order` |
+
+- Mỗi dòng xe tối đa 1 ảnh thumbnail (generated column + UNIQUE).
+- Không xóa được hãng còn dòng xe (`ON DELETE RESTRICT`).
+
+### D. `inventory_db` – Inventory Service (6 bảng)
+
+Từng chiếc xe cụ thể, chi nhánh, giữ xe, lịch sử trạng thái.
+
+| Bảng | Cột chính |
+|---|---|
+| `branches` | `id`, `name` (UNIQUE), `address`, `phone` |
+| `vehicles` | `id`, `version_id` (logic → `car_db.car_versions.id`), `branch_id` (FK), `vin` (UNIQUE), `license_plate` (UNIQUE), `condition`, `year`, `color`, `mileage`, `price`, `description`, `status` |
+| `vehicle_images` | `id`, `vehicle_id` (FK CASCADE), `image_url`, `is_thumbnail`, `sort_order` |
+| `vehicle_documents` | `id`, `vehicle_id` (FK CASCADE), `document_type`, `file_url` |
+| `vehicle_holds` | `id`, `vehicle_id` (FK), `order_id` (logic), `customer_id` (logic), `status` (`ACTIVE` / `RELEASED` / `CONVERTED`), `expires_at`, `released_reason` |
+| `vehicle_status_history` | `id`, `vehicle_id` (FK CASCADE), `old_status`, `new_status`, `reason`, `changed_by` (logic → user id, nullable) |
 
 - `condition`: `NEW` / `USED`; `status`: `AVAILABLE` / `RESERVED` / `SOLD` / `MAINTENANCE`.
 - Ràng buộc: xe `NEW` phải có `mileage = 0`; mỗi xe tối đa 1 ảnh thumbnail.
-- Mỗi dòng `vehicles` là **một chiếc xe cụ thể**, không phải một dòng xe.
+- Mỗi dòng `vehicles` là **một chiếc xe cụ thể**, không phải một dòng xe. Chi nhánh
+  lưu trực tiếp ở `vehicles.branch_id` (thay bảng `inventory` cũ).
+- `vehicle_holds`: UNIQUE trên cột sinh `active_vehicle_id` bảo đảm mỗi xe chỉ có
+  tối đa 1 lượt giữ `ACTIVE`; index (`status`, `expires_at`) phục vụ job hết hạn.
+- `version_id` không có FK vì `car_versions` nằm ở database khác; service kiểm tra
+  bằng REST tới car-service.
 
-**Nhóm 3 – Tồn kho**
-
-| Bảng | Cột chính |
-|---|---|
-| `branches` | `id`, `name`, `address`, `phone` |
-| `inventory` | `id`, `vehicle_id` (UNIQUE, FK), `branch_id` (FK), `quantity` = 1 |
-| `inventory_history` | `id`, `vehicle_id` (FK), `old_status`, `new_status`, `reason` |
-
-- `inventory` có UNIQUE trên `vehicle_id` và CHECK `quantity = 1`: mỗi chiếc xe nằm ở
-  đúng một chi nhánh tại một thời điểm. Không dùng bảng này để đếm số lượng theo dòng xe.
-
-### D. `order_db` – Order Service (6 bảng)
+### E. `order_db` – Order Service (6 bảng)
 
 | Bảng | Cột chính |
 |---|---|
@@ -152,7 +162,7 @@ FLUSH PRIVILEGES;
   `active_vehicle_id` bảo đảm mỗi chiếc xe chỉ có tối đa 1 reservation `ACTIVE`,
   ngăn 2 đơn hàng cùng giữ/mua thành công một chiếc xe.
 
-### E. `payment_db` – Payment Service (3 bảng)
+### F. `payment_db` – Payment Service (3 bảng)
 
 | Bảng | Cột chính |
 |---|---|
