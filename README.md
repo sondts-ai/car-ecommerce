@@ -15,7 +15,10 @@ Hệ thống thương mại điện tử bán ô tô, thiết kế theo kiến t
     ├── customer_db/
     │   ├── schema.sql
     │   └── seed.sql
-    ├── vehicle_db/
+    ├── car_db/
+    │   ├── schema.sql
+    │   └── seed.sql
+    ├── inventory_db/
     │   ├── schema.sql
     │   └── seed.sql
     ├── order_db/
@@ -32,7 +35,8 @@ Hệ thống thương mại điện tử bán ô tô, thiết kế theo kiến t
 |---|---|---|
 | Auth Service | `auth_db` | Tài khoản, vai trò, phân quyền |
 | Customer Service | `customer_db` | Hồ sơ khách hàng, sổ địa chỉ |
-| Vehicle Service | `vehicle_db` | Danh mục xe, từng chiếc xe, tồn kho |
+| Car Service (cổng 8084) | `car_db` | Danh mục xe: hãng, phân loại, dòng xe, phiên bản, ảnh dòng xe |
+| Inventory Service (cổng 8085) | `inventory_db` | Từng chiếc xe, chi nhánh, giữ xe, lịch sử trạng thái |
 | Order Service | `order_db` | Giỏ hàng, đơn hàng, đặt cọc, giữ xe |
 | Payment Service | `payment_db` | Thanh toán, giao dịch, hoàn tiền |
 
