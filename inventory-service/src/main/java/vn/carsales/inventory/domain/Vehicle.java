@@ -15,12 +15,9 @@ import vn.carsales.inventory.domain.Enums.VehicleStatus;
 public class Vehicle {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    /** Tham chiếu logic car_db.car_versions.id (không có FK). */
+    /** Khóa ngoại tới car_versions.id (cùng database vehicle_db). */
     @Column(name = "version_id", nullable = false)
     private Long versionId;
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "branch_id", nullable = false)
-    private Branch branch;
     @Column(nullable = false, length = 17)
     private String vin;
     @Column(name = "license_plate", length = 20)
@@ -58,8 +55,6 @@ public class Vehicle {
     public Long getId() { return id; }
     public Long getVersionId() { return versionId; }
     public void setVersionId(Long versionId) { this.versionId = versionId; }
-    public Branch getBranch() { return branch; }
-    public void setBranch(Branch branch) { this.branch = branch; }
     public String getVin() { return vin; }
     public void setVin(String vin) { this.vin = vin; }
     public String getLicensePlate() { return licensePlate; }

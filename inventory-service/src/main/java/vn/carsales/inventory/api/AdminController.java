@@ -5,7 +5,6 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -24,23 +23,18 @@ import vn.carsales.inventory.api.InventoryDtos.BranchResponse;
 import vn.carsales.inventory.api.InventoryDtos.DocumentRequest;
 import vn.carsales.inventory.api.InventoryDtos.DocumentResponse;
 import vn.carsales.inventory.api.InventoryDtos.HistoryResponse;
-import vn.carsales.inventory.api.InventoryDtos.HoldResponse;
 import vn.carsales.inventory.api.InventoryDtos.ImageRequest;
 import vn.carsales.inventory.api.InventoryDtos.ImageResponse;
 import vn.carsales.inventory.api.InventoryDtos.InternalVehicle;
-import vn.carsales.inventory.api.InventoryDtos.ReleaseRequest;
 import vn.carsales.inventory.api.InventoryDtos.StatusRequest;
 import vn.carsales.inventory.api.InventoryDtos.VehicleCreateRequest;
 import vn.carsales.inventory.api.InventoryDtos.VehicleDetail;
 import vn.carsales.inventory.api.InventoryDtos.VehicleStats;
 import vn.carsales.inventory.api.InventoryDtos.VehicleSummary;
 import vn.carsales.inventory.api.InventoryDtos.VehicleUpdateRequest;
-import vn.carsales.inventory.domain.Enums.HoldStatus;
 import vn.carsales.inventory.domain.Enums.VehicleCondition;
 import vn.carsales.inventory.domain.Enums.VehicleStatus;
-import vn.carsales.inventory.security.AuthUser;
 import vn.carsales.inventory.service.BranchService;
-import vn.carsales.inventory.service.HoldService;
 import vn.carsales.inventory.service.VehicleService;
 
 /** API admin (/api/v1/admin/**) và nội bộ (/api/v1/internal/**) của inventory-service. */
@@ -50,12 +44,10 @@ public class AdminController {
 
     private final VehicleService vehicles;
     private final BranchService branches;
-    private final HoldService holds;
 
-    public AdminController(VehicleService vehicles, BranchService branches, HoldService holds) {
+    public AdminController(VehicleService vehicles, BranchService branches) {
         this.vehicles = vehicles;
         this.branches = branches;
-        this.holds = holds;
     }
 
     private static <T> ResponseEntity<ApiResponse<T>> created(String msg, T data) {
@@ -79,9 +71,8 @@ public class AdminController {
     }
 
     @PostMapping("/admin/vehicles")
-    public ResponseEntity<ApiResponse<VehicleDetail>> createVehicle(@Valid @RequestBody VehicleCreateRequest req,
-            @AuthenticationPrincipal AuthUser user) {
-        return created("Nhập xe thành công", vehicles.create(req, user.userId()));
+    public ResponseEntity<ApiResponse<VehicleDetail>> createVehicle(@Valid @RequestBody VehicleCreateRequest req) {
+        return created("Nhập xe thành công", vehicles.create(req));
     }
 
     @GetMapping("/admin/vehicles/{id}")
@@ -102,9 +93,8 @@ public class AdminController {
     }
 
     @PatchMapping("/admin/vehicles/{id}/status")
-    public ApiResponse<HistoryResponse> changeStatus(@PathVariable Long id, @Valid @RequestBody StatusRequest req,
-            @AuthenticationPrincipal AuthUser user) {
-        return ApiResponse.ok("Đổi trạng thái xe thành công", vehicles.changeStatus(id, req, user.userId()));
+    public ApiResponse<HistoryResponse> changeStatus(@PathVariable Long id, @Valid @RequestBody StatusRequest req) {
+        return ApiResponse.ok("Đổi trạng thái xe thành công", vehicles.changeStatus(id, req));
     }
 
     @GetMapping("/admin/vehicles/{id}/history")
@@ -114,8 +104,8 @@ public class AdminController {
 
     @PatchMapping("/admin/vehicles/{id}/branch")
     public ApiResponse<HistoryResponse> changeBranch(@PathVariable Long id,
-            @Valid @RequestBody BranchChangeRequest req, @AuthenticationPrincipal AuthUser user) {
-        return ApiResponse.ok("Chuyển chi nhánh thành công", vehicles.changeBranch(id, req, user.userId()));
+            @Valid @RequestBody BranchChangeRequest req) {
+        return ApiResponse.ok("Chuyển chi nhánh thành công", vehicles.changeBranch(id, req));
     }
 
     // ------------------------------------------------------ images / documents
@@ -176,22 +166,6 @@ public class AdminController {
     public ApiResponse<Void> deleteBranch(@PathVariable Long id) {
         branches.delete(id);
         return ApiResponse.ok("Xóa chi nhánh thành công", null);
-    }
-
-    // ------------------------------------------------------------------- holds
-
-    @GetMapping("/admin/holds")
-    public ApiResponse<PageResponse<HoldResponse>> listHolds(@RequestParam(required = false) HoldStatus status,
-            @RequestParam(required = false) Long vehicleId, @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.ok("Danh sách lượt giữ xe", holds.list(status, vehicleId, page, size));
-    }
-
-    @PostMapping("/admin/holds/{id}/release")
-    public ApiResponse<HoldResponse> release(@PathVariable Long id, @Valid @RequestBody(required = false) ReleaseRequest req,
-            @AuthenticationPrincipal AuthUser user) {
-        return ApiResponse.ok("Giải phóng lượt giữ xe thành công",
-                holds.release(id, req == null ? null : req.reason(), user.userId()));
     }
 
     // ------------------------------------------------------------------- stats

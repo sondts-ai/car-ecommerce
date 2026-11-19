@@ -17,21 +17,14 @@ public interface VehicleRepository extends JpaRepository<Vehicle, Long>, JpaSpec
     boolean existsByVinIgnoreCaseAndIdNot(String vin, Long id);
     boolean existsByLicensePlateIgnoreCase(String plate);
     boolean existsByLicensePlateIgnoreCaseAndIdNot(String plate, Long id);
-    boolean existsByBranchId(Long branchId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select v from Vehicle v where v.id = :id")
     Optional<Vehicle> findByIdForUpdate(@Param("id") Long id);
-
-    @Query("select v from Vehicle v join fetch v.branch where v.id = :id")
-    Optional<Vehicle> findWithBranch(@Param("id") Long id);
 
     @Query("select v.status, count(v) from Vehicle v group by v.status")
     List<Object[]> countByStatus();
 
     @Query("select v.condition, count(v) from Vehicle v group by v.condition")
     List<Object[]> countByCondition();
-
-    @Query("select b.id, b.name, count(v) from Vehicle v join v.branch b group by b.id, b.name order by b.id")
-    List<Object[]> countByBranch();
 }

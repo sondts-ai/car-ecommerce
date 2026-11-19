@@ -16,5 +16,3 @@ app:
     allowed-origins: http://localhost:3000
   car-service:
     url: http://localhost:1
-  hold-expiry-job:
-    enabled: false

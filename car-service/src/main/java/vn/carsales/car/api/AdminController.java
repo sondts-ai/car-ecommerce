@@ -6,7 +6,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -20,8 +19,6 @@ import vn.carsales.car.api.CarDtos.BrandRequest;
 import vn.carsales.car.api.CarDtos.BrandResponse;
 import vn.carsales.car.api.CarDtos.CategoryRequest;
 import vn.carsales.car.api.CarDtos.CategoryResponse;
-import vn.carsales.car.api.CarDtos.ImageRequest;
-import vn.carsales.car.api.CarDtos.ImageResponse;
 import vn.carsales.car.api.CarDtos.InternalVersionResponse;
 import vn.carsales.car.api.CarDtos.ModelDetail;
 import vn.carsales.car.api.CarDtos.ModelRequest;
@@ -162,25 +159,6 @@ public class AdminController {
     public ApiResponse<Void> deleteVersion(@PathVariable Long id) {
         models.deleteVersion(id);
         return ApiResponse.ok("Xóa phiên bản thành công", null);
-    }
-
-    // ------------------------------------------------------------------ images
-
-    @PostMapping("/admin/car-models/{id}/images")
-    public ResponseEntity<ApiResponse<ImageResponse>> addImage(@PathVariable Long id,
-            @Valid @RequestBody ImageRequest req) {
-        return created("Thêm ảnh thành công", models.addImage(id, req));
-    }
-
-    @PatchMapping("/admin/car-images/{id}/thumbnail")
-    public ApiResponse<ImageResponse> setThumbnail(@PathVariable Long id) {
-        return ApiResponse.ok("Đặt ảnh đại diện thành công", models.setThumbnail(id));
-    }
-
-    @DeleteMapping("/admin/car-images/{id}")
-    public ApiResponse<Void> deleteImage(@PathVariable Long id) {
-        models.deleteImage(id);
-        return ApiResponse.ok("Xóa ảnh thành công", null);
     }
 
     // ---------------------------------------------------------------- internal

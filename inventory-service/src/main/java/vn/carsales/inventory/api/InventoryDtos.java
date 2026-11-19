@@ -13,11 +13,9 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import vn.carsales.inventory.domain.Branch;
 import vn.carsales.inventory.domain.Enums.DocumentType;
-import vn.carsales.inventory.domain.Enums.HoldStatus;
 import vn.carsales.inventory.domain.Enums.VehicleCondition;
 import vn.carsales.inventory.domain.Enums.VehicleStatus;
 import vn.carsales.inventory.domain.VehicleDocument;
-import vn.carsales.inventory.domain.VehicleHold;
 import vn.carsales.inventory.domain.VehicleImage;
 import vn.carsales.inventory.domain.VehicleStatusHistory;
 
@@ -74,7 +72,7 @@ public final class InventoryDtos {
                                 BranchResponse branch, VehicleCondition condition, Integer year, String color,
                                 Integer mileage, BigDecimal price, String description, VehicleStatus status,
                                 LocalDateTime createdAt, LocalDateTime updatedAt, List<ImageResponse> images,
-                                List<DocumentResponse> documents, HoldResponse activeHold) {
+                                List<DocumentResponse> documents) {
     }
 
     public record StatusRequest(@NotNull(message = "Trạng thái là bắt buộc") VehicleStatus status,
@@ -86,10 +84,10 @@ public final class InventoryDtos {
     }
 
     public record HistoryResponse(Long id, Long vehicleId, VehicleStatus oldStatus, VehicleStatus newStatus,
-                                  String reason, Long changedBy, LocalDateTime createdAt) {
+                                  String reason, LocalDateTime createdAt) {
         public static HistoryResponse of(VehicleStatusHistory h) {
             return new HistoryResponse(h.getId(), h.getVehicleId(), h.getOldStatus(), h.getNewStatus(),
-                    h.getReason(), h.getChangedBy(), h.getCreatedAt());
+                    h.getReason(), h.getCreatedAt());
         }
     }
 
@@ -117,19 +115,6 @@ public final class InventoryDtos {
             return new DocumentResponse(d.getId(), d.getVehicleId(), d.getDocumentType(), d.getFileUrl(),
                     d.getCreatedAt());
         }
-    }
-
-    // ---- Holds ----
-    public record HoldResponse(Long id, Long vehicleId, Long orderId, Long customerId, HoldStatus status,
-                               LocalDateTime expiresAt, String releasedReason, LocalDateTime createdAt,
-                               LocalDateTime updatedAt) {
-        public static HoldResponse of(VehicleHold h) {
-            return new HoldResponse(h.getId(), h.getVehicleId(), h.getOrderId(), h.getCustomerId(), h.getStatus(),
-                    h.getExpiresAt(), h.getReleasedReason(), h.getCreatedAt(), h.getUpdatedAt());
-        }
-    }
-
-    public record ReleaseRequest(@Size(max = 500, message = "Lý do tối đa 500 ký tự") String reason) {
     }
 
     // ---- Stats ----

@@ -1,7 +1,8 @@
 # car-service
 
-Service quản lý **danh mục xe** (hãng, phân loại, dòng xe, phiên bản, ảnh dòng xe) cho trang quản trị.
-Cổng mặc định **8084**, database `car_db` (xem `database/car_db`).
+Service quản lý **danh mục xe** (hãng, phân loại, dòng xe, phiên bản) cho trang quản trị.
+Cổng mặc định **8084**. Dùng database `vehicle_db` có sẵn (xem `database/vehicle_db`), **không thay đổi cấu trúc DB**;
+service này chỉ đọc/ghi các bảng `brands`, `categories`, `car_models`, `car_versions`, `car_model_categories`.
 
 ## Endpoint
 
@@ -16,14 +17,11 @@ Phản hồi: `{ "success": bool, "message": "...", "data": ... }`. Danh sách p
 | GET / PUT / DELETE | `/api/v1/admin/brands/{id}` | DELETE → 409 nếu còn dòng xe |
 | GET / POST | `/api/v1/admin/categories` | hỗ trợ `q`, `page`, `size` |
 | GET / PUT / DELETE | `/api/v1/admin/categories/{id}` | xóa sẽ gỡ phân loại khỏi các dòng xe |
-| GET | `/api/v1/admin/car-models?brandId=&categoryId=&q=&page=&size=` | kèm tên hãng, phân loại, thumbnail |
+| GET | `/api/v1/admin/car-models?brandId=&categoryId=&q=&page=&size=` | kèm tên hãng, danh sách phân loại |
 | POST | `/api/v1/admin/car-models` | `{brandId, name, description, categoryIds[]}` |
-| GET / PUT / DELETE | `/api/v1/admin/car-models/{id}` | GET kèm versions + images; DELETE → 409 nếu còn phiên bản |
+| GET / PUT / DELETE | `/api/v1/admin/car-models/{id}` | GET kèm versions; DELETE → 409 nếu còn phiên bản |
 | GET / POST | `/api/v1/admin/car-models/{id}/versions` | |
-| PUT / DELETE | `/api/v1/admin/versions/{id}` | |
-| POST | `/api/v1/admin/car-models/{id}/images` | `{imageUrl, isThumbnail, sortOrder}` |
-| PATCH | `/api/v1/admin/car-images/{id}/thumbnail` | bỏ thumbnail cũ trong cùng transaction |
-| DELETE | `/api/v1/admin/car-images/{id}` | |
+| PUT / DELETE | `/api/v1/admin/versions/{id}` | DELETE → 409 nếu phiên bản đang có xe (khóa ngoại từ `vehicles`) |
 | GET | `/api/v1/internal/versions/{id}` | `{versionId, versionName, modelId, modelName, brandId, brandName, fuelType, transmission, seats}` |
 
 Swagger UI: `http://localhost:8084/swagger-ui.html`.
@@ -33,7 +31,7 @@ Swagger UI: `http://localhost:8084/swagger-ui.html`.
 | Biến | Mặc định (local) |
 |---|---|
 | `SERVER_PORT` | `8084` |
-| `DB_URL` | `jdbc:mysql://localhost:3306/car_db?...` |
+| `DB_URL` | `jdbc:mysql://localhost:3306/vehicle_db?...` |
 | `DB_USERNAME` / `DB_PASSWORD` | `car_app` / `CarApp@123` |
 | `JWT_SECRET` | giá trị dev cố định, **phải trùng Auth Service** và ≥ 32 byte |
 | `JWT_ISSUER` | `car-sales-auth` |
@@ -43,8 +41,8 @@ Swagger UI: `http://localhost:8084/swagger-ui.html`.
 
 ```bash
 # 1. Tạo database (xem database/README.md)
-mysql -ucar_app -p < ../database/car_db/schema.sql
-mysql -ucar_app -p < ../database/car_db/seed.sql
+mysql -ucar_app -p < ../database/vehicle_db/schema.sql
+mysql -ucar_app -p < ../database/vehicle_db/seed.sql
 # 2. Chạy service
 mvn spring-boot:run
 ```
@@ -59,10 +57,8 @@ Test dùng H2 (chế độ MySQL), tự sinh JWT HS256 để thử các case 401
 
 ## Chưa làm / cần hỏi
 
-- Xóa phiên bản (`DELETE /versions/{id}`) hiện **không** kiểm tra xem inventory-service còn xe dùng phiên bản đó
-  hay không (yêu cầu chưa nêu, và không được truy cập DB service khác). Cần thống nhất: gọi API nội bộ của
-  inventory để chặn 409, hay chấp nhận.
-- Chỉ role `ADMIN` được vào API admin; `STAFF` chưa có quyền (đặc tả chỉ nói ADMIN).
-- Ràng buộc "1 thumbnail / dòng xe" ở MySQL do cột sinh + UNIQUE đảm bảo; test H2 chỉ kiểm tra logic của service.
-- Chưa chạy thử với MySQL thật (Hibernate `validate`): đã chạy test bằng H2, chưa kiểm chứng trên MySQL.
+- **Ảnh dòng xe** (thumbnail, thêm/xóa ảnh cho dòng xe) chưa làm được: `vehicle_db` hiện có không có bảng ảnh cho dòng xe
+  (chỉ có `vehicle_images` cho từng chiếc xe). Cần nhóm thống nhất nếu muốn bổ sung bảng.
+- Chỉ role `ADMIN` được vào API admin; `STAFF` chưa có quyền (đặc tả chỉ nêu ADMIN).
+- Chưa chạy thử với MySQL thật (Hibernate `validate`); test mới chạy trên H2.
 - `JWT_SECRET` mặc định chỉ để chạy local, không dùng ở môi trường thật.

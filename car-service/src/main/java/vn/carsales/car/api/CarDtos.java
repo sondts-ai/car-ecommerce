@@ -9,7 +9,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import vn.carsales.car.domain.Brand;
-import vn.carsales.car.domain.CarImage;
 import vn.carsales.car.domain.CarVersion;
 import vn.carsales.car.domain.Category;
 import vn.carsales.car.domain.FuelType;
@@ -54,12 +53,12 @@ public final class CarDtos {
     }
 
     public record ModelSummary(Long id, Long brandId, String brandName, String name, String description,
-                               List<CategoryResponse> categories, String thumbnailUrl, LocalDateTime createdAt) {
+                               List<CategoryResponse> categories, LocalDateTime createdAt) {
     }
 
     public record ModelDetail(Long id, Long brandId, String brandName, String name, String description,
-                              List<CategoryResponse> categories, String thumbnailUrl, LocalDateTime createdAt,
-                              List<VersionResponse> versions, List<ImageResponse> images) {
+                              List<CategoryResponse> categories, LocalDateTime createdAt,
+                              List<VersionResponse> versions) {
     }
 
     // ---- Version ----
@@ -83,18 +82,5 @@ public final class CarDtos {
     public record InternalVersionResponse(Long versionId, String versionName, Long modelId, String modelName,
                                           Long brandId, String brandName, FuelType fuelType,
                                           Transmission transmission, Integer seats) {
-    }
-
-    // ---- Image ----
-    public record ImageRequest(
-            @NotBlank(message = "imageUrl không được để trống") @Size(max = 500, message = "imageUrl tối đa 500 ký tự") String imageUrl,
-            Boolean isThumbnail,
-            @Min(value = 0, message = "sortOrder phải >= 0") Integer sortOrder) {
-    }
-
-    public record ImageResponse(Long id, Long modelId, String imageUrl, boolean isThumbnail, int sortOrder) {
-        public static ImageResponse of(CarImage i) {
-            return new ImageResponse(i.getId(), i.getModelId(), i.getImageUrl(), i.isThumbnail(), i.getSortOrder());
-        }
     }
 }

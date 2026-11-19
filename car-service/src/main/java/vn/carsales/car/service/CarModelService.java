@@ -1,13 +1,12 @@
 package vn.carsales.car.service;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
@@ -17,8 +16,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import jakarta.persistence.criteria.Predicate;
 import vn.carsales.car.api.CarDtos.CategoryResponse;
-import vn.carsales.car.api.CarDtos.ImageRequest;
-import vn.carsales.car.api.CarDtos.ImageResponse;
 import vn.carsales.car.api.CarDtos.InternalVersionResponse;
 import vn.carsales.car.api.CarDtos.ModelDetail;
 import vn.carsales.car.api.CarDtos.ModelRequest;
@@ -27,17 +24,15 @@ import vn.carsales.car.api.CarDtos.VersionRequest;
 import vn.carsales.car.api.CarDtos.VersionResponse;
 import vn.carsales.car.api.PageResponse;
 import vn.carsales.car.domain.Brand;
-import vn.carsales.car.domain.CarImage;
 import vn.carsales.car.domain.CarModel;
 import vn.carsales.car.domain.CarVersion;
 import vn.carsales.car.domain.Category;
 import vn.carsales.car.repository.BrandRepository;
-import vn.carsales.car.repository.CarImageRepository;
 import vn.carsales.car.repository.CarModelRepository;
 import vn.carsales.car.repository.CarVersionRepository;
 import vn.carsales.car.repository.CategoryRepository;
 
-/** Dòng xe + phiên bản + ảnh dòng xe. */
+/** Dòng xe + phiên bản. */
 @Service
 public class CarModelService {
 
@@ -45,15 +40,13 @@ public class CarModelService {
     private final BrandRepository brands;
     private final CategoryRepository categories;
     private final CarVersionRepository versions;
-    private final CarImageRepository images;
 
     public CarModelService(CarModelRepository models, BrandRepository brands, CategoryRepository categories,
-                           CarVersionRepository versions, CarImageRepository images) {
+                           CarVersionRepository versions) {
         this.models = models;
         this.brands = brands;
         this.categories = categories;
         this.versions = versions;
-        this.images = images;
     }
 
     // ------------------------------------------------------------------ models
@@ -75,22 +68,15 @@ public class CarModelService {
             return cb.and(ps.toArray(new Predicate[0]));
         };
         Page<CarModel> result = models.findAll(spec, PageResponse.pageable(page, size));
-        List<Long> ids = result.getContent().stream().map(CarModel::getId).toList();
-        Map<Long, String> thumbs = ids.isEmpty() ? Map.of() : images.findThumbnails(ids).stream()
-                .collect(Collectors.toMap(CarImage::getModelId, CarImage::getImageUrl, (a, b) -> a));
-        return PageResponse.of(result, m -> summary(m, thumbs.get(m.getId())));
+        return PageResponse.of(result, this::summary);
     }
 
     @Transactional(readOnly = true)
     public ModelDetail get(Long id) {
         CarModel m = findModel(id);
-        List<ImageResponse> imgs = images.findByModelIdOrderBySortOrderAscIdAsc(id).stream()
-                .map(ImageResponse::of).toList();
-        String thumb = imgs.stream().filter(ImageResponse::isThumbnail).map(ImageResponse::imageUrl)
-                .findFirst().orElse(null);
         List<VersionResponse> vs = versions.findByModelIdOrderByIdAsc(id).stream().map(VersionResponse::of).toList();
         return new ModelDetail(m.getId(), m.getBrand().getId(), m.getBrand().getName(), m.getName(),
-                m.getDescription(), categoryList(m), thumb, m.getCreatedAt(), vs, imgs);
+                m.getDescription(), categoryList(m), m.getCreatedAt(), vs);
     }
 
     @Transactional
@@ -105,8 +91,7 @@ public class CarModelService {
         m.setName(name);
         m.setDescription(req.description());
         m.getCategories().addAll(findCategories(req.categoryIds()));
-        m = models.saveAndFlush(m);
-        return summary(m, null);
+        return summary(models.saveAndFlush(m));
     }
 
     @Transactional
@@ -122,9 +107,7 @@ public class CarModelService {
         m.setDescription(req.description());
         m.getCategories().clear();
         m.getCategories().addAll(findCategories(req.categoryIds()));
-        m = models.saveAndFlush(m);
-        String thumb = images.findThumbnails(List.of(id)).stream().map(CarImage::getImageUrl).findFirst().orElse(null);
-        return summary(m, thumb);
+        return summary(models.saveAndFlush(m));
     }
 
     @Transactional
@@ -133,7 +116,6 @@ public class CarModelService {
         if (versions.existsByModelId(id)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Không thể xóa dòng xe còn phiên bản");
         }
-        images.deleteByModelId(id);
         models.delete(m);
         models.flush();
     }
@@ -170,12 +152,16 @@ public class CarModelService {
         return VersionResponse.of(versions.saveAndFlush(v));
     }
 
-    /** Lưu ý: car-service không biết xe nào ở inventory-service đang dùng phiên bản này (xem README). */
+    /** Bảng vehicles có khóa ngoại tới car_versions (RESTRICT) nên phiên bản đang có xe sẽ bị chặn (409). */
     @Transactional
     public void deleteVersion(Long id) {
         CarVersion v = findVersion(id);
-        versions.delete(v);
-        versions.flush();
+        try {
+            versions.delete(v);
+            versions.flush();
+        } catch (DataIntegrityViolationException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Không thể xóa phiên bản đang có xe");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -185,39 +171,6 @@ public class CarModelService {
         CarModel m = v.getModel();
         return new InternalVersionResponse(v.getId(), v.getVersionName(), m.getId(), m.getName(),
                 m.getBrand().getId(), m.getBrand().getName(), v.getFuelType(), v.getTransmission(), v.getSeats());
-    }
-
-    // ------------------------------------------------------------------ images
-
-    @Transactional
-    public ImageResponse addImage(Long modelId, ImageRequest req) {
-        findModel(modelId);
-        boolean thumb = Boolean.TRUE.equals(req.isThumbnail());
-        if (thumb) {
-            images.clearThumbnail(modelId);
-        }
-        CarImage img = new CarImage();
-        img.setModelId(modelId);
-        img.setImageUrl(req.imageUrl().trim());
-        img.setThumbnail(thumb);
-        img.setSortOrder(req.sortOrder() == null ? 0 : req.sortOrder());
-        return ImageResponse.of(images.saveAndFlush(img));
-    }
-
-    /** Bỏ thumbnail cũ và đặt thumbnail mới trong cùng một transaction. */
-    @Transactional
-    public ImageResponse setThumbnail(Long imageId) {
-        CarImage img = findImage(imageId);
-        images.clearThumbnail(img.getModelId());
-        img = findImage(imageId); // clearThumbnail đã clear persistence context
-        img.setThumbnail(true);
-        return ImageResponse.of(images.saveAndFlush(img));
-    }
-
-    @Transactional
-    public void deleteImage(Long imageId) {
-        images.delete(findImage(imageId));
-        images.flush();
     }
 
     // ----------------------------------------------------------------- helpers
@@ -230,11 +183,6 @@ public class CarModelService {
     private CarVersion findVersion(Long id) {
         return versions.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy phiên bản xe"));
-    }
-
-    private CarImage findImage(Long id) {
-        return images.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy ảnh"));
     }
 
     private Brand findBrandForBody(Long brandId) {
@@ -264,11 +212,11 @@ public class CarModelService {
 
     private List<CategoryResponse> categoryList(CarModel m) {
         return m.getCategories().stream().map(CategoryResponse::of)
-                .sorted(java.util.Comparator.comparing(CategoryResponse::id)).toList();
+                .sorted(Comparator.comparing(CategoryResponse::id)).toList();
     }
 
-    private ModelSummary summary(CarModel m, String thumbnailUrl) {
+    private ModelSummary summary(CarModel m) {
         return new ModelSummary(m.getId(), m.getBrand().getId(), m.getBrand().getName(), m.getName(),
-                m.getDescription(), categoryList(m), thumbnailUrl, m.getCreatedAt());
+                m.getDescription(), categoryList(m), m.getCreatedAt());
     }
 }

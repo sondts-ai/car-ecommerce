@@ -2,11 +2,12 @@ package vn.carsales.inventory.service;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
@@ -18,13 +19,14 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import vn.carsales.inventory.api.InventoryDtos.BranchChangeRequest;
 import vn.carsales.inventory.api.InventoryDtos.BranchCount;
 import vn.carsales.inventory.api.InventoryDtos.BranchResponse;
 import vn.carsales.inventory.api.InventoryDtos.DocumentRequest;
 import vn.carsales.inventory.api.InventoryDtos.DocumentResponse;
 import vn.carsales.inventory.api.InventoryDtos.HistoryResponse;
-import vn.carsales.inventory.api.InventoryDtos.HoldResponse;
 import vn.carsales.inventory.api.InventoryDtos.ImageRequest;
 import vn.carsales.inventory.api.InventoryDtos.ImageResponse;
 import vn.carsales.inventory.api.InventoryDtos.InternalVehicle;
@@ -36,47 +38,46 @@ import vn.carsales.inventory.api.InventoryDtos.VehicleSummary;
 import vn.carsales.inventory.api.InventoryDtos.VehicleUpdateRequest;
 import vn.carsales.inventory.api.PageResponse;
 import vn.carsales.inventory.domain.Branch;
-import vn.carsales.inventory.domain.Enums.HoldStatus;
 import vn.carsales.inventory.domain.Enums.VehicleCondition;
 import vn.carsales.inventory.domain.Enums.VehicleStatus;
+import vn.carsales.inventory.domain.Inventory;
 import vn.carsales.inventory.domain.Vehicle;
 import vn.carsales.inventory.domain.VehicleDocument;
-import vn.carsales.inventory.domain.VehicleHold;
 import vn.carsales.inventory.domain.VehicleImage;
 import vn.carsales.inventory.domain.VehicleStatusHistory;
 import vn.carsales.inventory.repository.BranchRepository;
+import vn.carsales.inventory.repository.InventoryRepository;
 import vn.carsales.inventory.repository.VehicleDocumentRepository;
-import vn.carsales.inventory.repository.VehicleHoldRepository;
 import vn.carsales.inventory.repository.VehicleImageRepository;
 import vn.carsales.inventory.repository.VehicleRepository;
 import vn.carsales.inventory.repository.VehicleStatusHistoryRepository;
 
 /**
- * Nghiệp vụ từng chiếc xe. Các lời gọi sang car-service (HTTP) nằm NGOÀI transaction DB,
- * phần ghi DB dùng TransactionTemplate.
+ * Nghiệp vụ từng chiếc xe. Chi nhánh của xe nằm ở bảng inventory (1 xe = 1 dòng).
+ * Các lời gọi sang car-service (HTTP) nằm NGOÀI transaction DB; phần ghi DB dùng TransactionTemplate.
  */
 @Service
 public class VehicleService {
 
     private final VehicleRepository vehicles;
     private final BranchRepository branches;
+    private final InventoryRepository inventory;
     private final VehicleImageRepository images;
     private final VehicleDocumentRepository documents;
-    private final VehicleHoldRepository holds;
     private final VehicleStatusHistoryRepository history;
     private final CarServiceClient cars;
     private final TransactionTemplate tx;
     private final TransactionTemplate txRead;
 
-    public VehicleService(VehicleRepository vehicles, BranchRepository branches, VehicleImageRepository images,
-                          VehicleDocumentRepository documents, VehicleHoldRepository holds,
+    public VehicleService(VehicleRepository vehicles, BranchRepository branches, InventoryRepository inventory,
+                          VehicleImageRepository images, VehicleDocumentRepository documents,
                           VehicleStatusHistoryRepository history, CarServiceClient cars,
                           PlatformTransactionManager txManager) {
         this.vehicles = vehicles;
         this.branches = branches;
+        this.inventory = inventory;
         this.images = images;
         this.documents = documents;
-        this.holds = holds;
         this.history = history;
         this.cars = cars;
         this.tx = new TransactionTemplate(txManager);
@@ -92,11 +93,17 @@ public class VehicleService {
         Specification<Vehicle> spec = (root, query, cb) -> {
             List<Predicate> ps = new ArrayList<>();
             if (status != null) ps.add(cb.equal(root.get("status"), status));
-            if (branchId != null) ps.add(cb.equal(root.get("branch").get("id"), branchId));
             if (versionId != null) ps.add(cb.equal(root.get("versionId"), versionId));
             if (condition != null) ps.add(cb.equal(root.get("condition"), condition));
             if (minPrice != null) ps.add(cb.greaterThanOrEqualTo(root.get("price"), minPrice));
             if (maxPrice != null) ps.add(cb.lessThanOrEqualTo(root.get("price"), maxPrice));
+            if (branchId != null) {
+                Subquery<Long> sq = query.subquery(Long.class);
+                Root<Inventory> inv = sq.from(Inventory.class);
+                sq.select(inv.get("id")).where(cb.equal(inv.get("vehicleId"), root.get("id")),
+                        cb.equal(inv.get("branch").get("id"), branchId));
+                ps.add(cb.exists(sq));
+            }
             if (q != null && !q.isBlank()) {
                 String like = "%" + q.trim().toLowerCase() + "%";
                 ps.add(cb.or(cb.like(cb.lower(root.get("vin")), like),
@@ -108,7 +115,9 @@ public class VehicleService {
             Page<Vehicle> p = vehicles.findAll(spec, PageResponse.pageable(page, size));
             List<Long> ids = p.getContent().stream().map(Vehicle::getId).toList();
             Map<Long, String> thumbs = thumbnails(ids);
-            return PageResponse.of(p, v -> summary(v, null, thumbs.get(v.getId())));
+            Map<Long, Inventory> inv = ids.isEmpty() ? Map.of() : inventory.findByVehicleIds(ids).stream()
+                    .collect(Collectors.toMap(Inventory::getVehicleId, Function.identity(), (a, b) -> a));
+            return PageResponse.of(p, v -> summary(v, null, thumbs.get(v.getId()), inv.get(v.getId())));
         });
         // cache đơn giản theo versionId trong phạm vi request
         Map<Long, String> names = new HashMap<>();
@@ -119,17 +128,18 @@ public class VehicleService {
     }
 
     public VehicleDetail get(Long id) {
-        String name = nameOf(versionIdOf(id));
-        return txRead.execute(s -> detail(findWithBranch(id), name));
+        String name = lookupName(versionIdOf(id));
+        return txRead.execute(s -> detail(find(id), name));
     }
 
     public InternalVehicle internal(Long id) {
-        String name = nameOf(versionIdOf(id));
+        String name = lookupName(versionIdOf(id));
         return txRead.execute(s -> {
-            Vehicle v = findWithBranch(id);
+            Vehicle v = find(id);
             String thumb = thumbnails(List.of(id)).get(id);
+            Branch b = inventory.findByVehicleId(id).map(Inventory::getBranch).orElse(null);
             return new InternalVehicle(v.getId(), v.getVin(), name, v.getVersionId(), v.getCondition(), v.getYear(),
-                    v.getColor(), v.getMileage(), v.getPrice(), v.getStatus(), v.getBranch().getName(), thumb);
+                    v.getColor(), v.getMileage(), v.getPrice(), v.getStatus(), b == null ? null : b.getName(), thumb);
         });
     }
 
@@ -142,13 +152,13 @@ public class VehicleService {
 
     public VehicleStats stats() {
         return txRead.execute(s -> {
-            Map<String, Long> byStatus = new java.util.LinkedHashMap<>();
+            Map<String, Long> byStatus = new LinkedHashMap<>();
             for (VehicleStatus st : VehicleStatus.values()) byStatus.put(st.name(), 0L);
             vehicles.countByStatus().forEach(r -> byStatus.put(((VehicleStatus) r[0]).name(), (Long) r[1]));
-            Map<String, Long> byCondition = new java.util.LinkedHashMap<>();
+            Map<String, Long> byCondition = new LinkedHashMap<>();
             for (VehicleCondition c : VehicleCondition.values()) byCondition.put(c.name(), 0L);
             vehicles.countByCondition().forEach(r -> byCondition.put(((VehicleCondition) r[0]).name(), (Long) r[1]));
-            List<BranchCount> byBranch = vehicles.countByBranch().stream()
+            List<BranchCount> byBranch = inventory.countByBranch().stream()
                     .map(r -> new BranchCount((Long) r[0], (String) r[1], (Long) r[2])).toList();
             long total = byStatus.values().stream().mapToLong(Long::longValue).sum();
             return new VehicleStats(total, byStatus, byBranch, byCondition);
@@ -157,7 +167,7 @@ public class VehicleService {
 
     // ------------------------------------------------------------------- write
 
-    public VehicleDetail create(VehicleCreateRequest req, Long userId) {
+    public VehicleDetail create(VehicleCreateRequest req) {
         Integer mileage = req.mileage() == null ? 0 : req.mileage();
         checkNewMileage(req.condition(), mileage);
         String name = cars.findVersion(req.versionId())
@@ -176,7 +186,6 @@ public class VehicleService {
             }
             Vehicle v = new Vehicle();
             v.setVersionId(req.versionId());
-            v.setBranch(branch);
             v.setVin(vin);
             v.setLicensePlate(plate);
             v.setCondition(req.condition());
@@ -187,7 +196,11 @@ public class VehicleService {
             v.setDescription(req.description());
             v.setStatus(VehicleStatus.AVAILABLE);
             v = vehicles.saveAndFlush(v);
-            history.save(VehicleStatusHistory.of(v.getId(), null, VehicleStatus.AVAILABLE, "Nhập xe", userId));
+            Inventory inv = new Inventory();
+            inv.setVehicleId(v.getId());
+            inv.setBranch(branch);
+            inventory.saveAndFlush(inv);
+            history.save(VehicleStatusHistory.of(v.getId(), null, VehicleStatus.AVAILABLE, "Nhập xe"));
             return detail(v, name);
         });
     }
@@ -198,7 +211,7 @@ public class VehicleService {
         Long currentVersionId = versionIdOf(id);
         String name;
         if (Objects.equals(currentVersionId, req.versionId())) {
-            name = nameOf(currentVersionId);
+            name = lookupName(currentVersionId);
         } else {
             name = cars.findVersion(req.versionId())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Phiên bản xe không tồn tại"))
@@ -227,7 +240,7 @@ public class VehicleService {
             v.setPrice(req.price());
             v.setDescription(req.description());
             v = vehicles.saveAndFlush(v);
-            return detail(findWithBranch(id), name);
+            return detail(v, name);
         });
     }
 
@@ -237,29 +250,20 @@ public class VehicleService {
             if (v.getStatus() == VehicleStatus.RESERVED || v.getStatus() == VehicleStatus.SOLD) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Không thể xóa xe đang được giữ hoặc đã bán");
             }
-            if (holds.existsByVehicleIdAndStatus(id, HoldStatus.ACTIVE)) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Không thể xóa xe đang có lượt giữ ACTIVE");
-            }
-            if (holds.existsByVehicleId(id)) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Xe đã có lịch sử giữ xe, không thể xóa");
-            }
             images.deleteAll(images.findByVehicleIdOrderBySortOrderAscIdAsc(id));
             documents.deleteAll(documents.findByVehicleIdOrderByIdAsc(id));
             history.deleteAll(history.findByVehicleIdOrderByCreatedAtDescIdDesc(id));
+            inventory.findByVehicleId(id).ifPresent(inventory::delete);
             vehicles.delete(v);
             vehicles.flush();
         });
     }
 
-    public HistoryResponse changeStatus(Long id, StatusRequest req, Long userId) {
+    public HistoryResponse changeStatus(Long id, StatusRequest req) {
         return tx.execute(s -> {
             Vehicle v = vehicles.findByIdForUpdate(id).orElseThrow(this::notFound);
             if (v.getStatus() == VehicleStatus.SOLD) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Xe đã bán, không thể đổi trạng thái");
-            }
-            if (holds.existsByVehicleIdAndStatus(id, HoldStatus.ACTIVE)) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT,
-                        "Xe đang có lượt giữ ACTIVE, hãy giải phóng lượt giữ trước khi đổi trạng thái");
             }
             if (v.getStatus() == req.status()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Xe đang ở trạng thái này rồi");
@@ -268,26 +272,28 @@ public class VehicleService {
             v.setStatus(req.status());
             vehicles.saveAndFlush(v);
             return HistoryResponse.of(history.saveAndFlush(
-                    VehicleStatusHistory.of(id, old, req.status(), req.reason(), userId)));
+                    VehicleStatusHistory.of(id, old, req.status(), req.reason())));
         });
     }
 
-    /** Chuyển chi nhánh; lý do được ghi vào vehicle_status_history (trạng thái giữ nguyên). */
-    public HistoryResponse changeBranch(Long id, BranchChangeRequest req, Long userId) {
+    /** Chuyển chi nhánh (cập nhật bảng inventory); lý do ghi vào inventory_history, trạng thái xe giữ nguyên. */
+    public HistoryResponse changeBranch(Long id, BranchChangeRequest req) {
         return tx.execute(s -> {
             Vehicle v = vehicles.findByIdForUpdate(id).orElseThrow(this::notFound);
             Branch target = branches.findById(req.branchId()).orElseThrow(
                     () -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chi nhánh không tồn tại"));
-            Branch from = v.getBranch();
+            Inventory inv = inventory.findByVehicleId(id).orElseThrow(
+                    () -> new ResponseStatusException(HttpStatus.CONFLICT, "Xe chưa được gán chi nhánh trong kho"));
+            Branch from = inv.getBranch();
             if (from.getId().equals(target.getId())) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Xe đang ở chi nhánh này rồi");
             }
-            v.setBranch(target);
-            vehicles.saveAndFlush(v);
+            inv.setBranch(target);
+            inventory.saveAndFlush(inv);
             String reason = "Chuyển chi nhánh từ " + from.getName() + " sang " + target.getName()
                     + (req.reason() == null || req.reason().isBlank() ? "" : ": " + req.reason().trim());
             return HistoryResponse.of(history.saveAndFlush(
-                    VehicleStatusHistory.of(id, v.getStatus(), v.getStatus(), reason, userId)));
+                    VehicleStatusHistory.of(id, v.getStatus(), v.getStatus(), reason)));
         });
     }
 
@@ -356,10 +362,6 @@ public class VehicleService {
         return vehicles.findById(id).orElseThrow(this::notFound);
     }
 
-    private Vehicle findWithBranch(Long id) {
-        return vehicles.findWithBranch(id).orElseThrow(this::notFound);
-    }
-
     private VehicleImage findImage(Long id) {
         return images.findById(id).orElseThrow(
                 () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy ảnh"));
@@ -372,10 +374,6 @@ public class VehicleService {
     /** Tên đầy đủ "Hãng Dòng Phiên bản"; null nếu car-service báo phiên bản không còn tồn tại. */
     private String lookupName(Long versionId) {
         return cars.findVersion(versionId).map(CarServiceClient.VersionInfo::fullName).orElse(null);
-    }
-
-    private String nameOf(Long versionId) {
-        return lookupName(versionId);
     }
 
     private static void checkNewMileage(VehicleCondition condition, Integer mileage) {
@@ -400,10 +398,11 @@ public class VehicleService {
                 .collect(Collectors.toMap(VehicleImage::getVehicleId, VehicleImage::getImageUrl, (a, b) -> a));
     }
 
-    private VehicleSummary summary(Vehicle v, String name, String thumbnailUrl) {
+    private VehicleSummary summary(Vehicle v, String name, String thumbnailUrl, Inventory inv) {
+        Branch b = inv == null ? null : inv.getBranch();
         return new VehicleSummary(v.getId(), v.getVin(), v.getLicensePlate(), name, v.getVersionId(),
-                v.getBranch().getId(), v.getBranch().getName(), v.getCondition(), v.getYear(), v.getColor(),
-                v.getMileage(), v.getPrice(), v.getStatus(), thumbnailUrl);
+                b == null ? null : b.getId(), b == null ? null : b.getName(), v.getCondition(), v.getYear(),
+                v.getColor(), v.getMileage(), v.getPrice(), v.getStatus(), thumbnailUrl);
     }
 
     private VehicleSummary withName(VehicleSummary s, String name) {
@@ -417,11 +416,10 @@ public class VehicleService {
                 .map(ImageResponse::of).toList();
         List<DocumentResponse> docs = documents.findByVehicleIdOrderByIdAsc(v.getId()).stream()
                 .map(DocumentResponse::of).toList();
-        HoldResponse active = holds.findFirstByVehicleIdAndStatus(v.getId(), HoldStatus.ACTIVE)
-                .map(HoldResponse::of).orElse(null);
-        return new VehicleDetail(v.getId(), v.getVin(), v.getLicensePlate(), name, v.getVersionId(),
-                BranchResponse.of(v.getBranch()), v.getCondition(), v.getYear(), v.getColor(), v.getMileage(),
-                v.getPrice(), v.getDescription(), v.getStatus(), v.getCreatedAt(), v.getUpdatedAt(), imgs, docs,
-                active);
+        BranchResponse branch = inventory.findByVehicleId(v.getId()).map(i -> BranchResponse.of(i.getBranch()))
+                .orElse(null);
+        return new VehicleDetail(v.getId(), v.getVin(), v.getLicensePlate(), name, v.getVersionId(), branch,
+                v.getCondition(), v.getYear(), v.getColor(), v.getMileage(), v.getPrice(), v.getDescription(),
+                v.getStatus(), v.getCreatedAt(), v.getUpdatedAt(), imgs, docs);
     }
 }

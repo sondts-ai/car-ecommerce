@@ -25,7 +25,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import vn.carsales.car.repository.CarImageRepository;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -36,7 +35,6 @@ class CarServiceApiTest {
 
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
-    @Autowired CarImageRepository imageRepository;
 
     private String token(String role) {
         return Jwts.builder().issuer("car-sales-auth").claim("userId", 7).claim("role", role)
@@ -62,12 +60,6 @@ class CarServiceApiTest {
     private long createModel(long brandId, String name) throws Exception {
         return call(post("/api/v1/admin/car-models")
                 .content("{\"brandId\":" + brandId + ",\"name\":\"" + name + "\"}"), 201)
-                .path("data").path("id").asLong();
-    }
-
-    private long addImage(long modelId, String url, boolean thumb) throws Exception {
-        return call(post("/api/v1/admin/car-models/" + modelId + "/images")
-                .content("{\"imageUrl\":\"" + url + "\",\"isThumbnail\":" + thumb + ",\"sortOrder\":1}"), 201)
                 .path("data").path("id").asLong();
     }
 
@@ -116,45 +108,17 @@ class CarServiceApiTest {
     }
 
     @Test
-    void settingNewThumbnailClearsOldOne() throws Exception {
-        long modelId = createModel(createBrand("Toyota"), "Camry");
-        long first = addImage(modelId, "http://img/1.jpg", true);
-        long second = addImage(modelId, "http://img/2.jpg", false);
-
-        call(patch("/api/v1/admin/car-images/" + second + "/thumbnail"), 200);
-
-        var all = imageRepository.findByModelIdOrderBySortOrderAscIdAsc(modelId);
-        assertThat(all).filteredOn(i -> i.isThumbnail()).extracting(i -> i.getId()).containsExactly(second);
-        assertThat(all).filteredOn(i -> i.getId().equals(first)).extracting(i -> i.isThumbnail())
-                .containsExactly(false);
-    }
-
-    @Test
-    void addingThumbnailImageClearsOldOne() throws Exception {
-        long modelId = createModel(createBrand("Toyota"), "Vios");
-        addImage(modelId, "http://img/1.jpg", true);
-        long second = addImage(modelId, "http://img/2.jpg", true);
-        var thumbs = imageRepository.findByModelIdOrderBySortOrderAscIdAsc(modelId).stream()
-                .filter(i -> i.isThumbnail()).toList();
-        assertThat(thumbs).hasSize(1);
-        assertThat(thumbs.get(0).getId()).isEqualTo(second);
-    }
-
-    @Test
-    void modelListIncludesBrandCategoriesAndThumbnail() throws Exception {
+    void modelListIncludesBrandAndCategories() throws Exception {
         long brandId = createBrand("Toyota");
         long catId = call(post("/api/v1/admin/categories").content("{\"name\":\"Sedan\"}"), 201)
                 .path("data").path("id").asLong();
-        long modelId = call(post("/api/v1/admin/car-models").content(
-                "{\"brandId\":" + brandId + ",\"name\":\"Camry\",\"categoryIds\":[" + catId + "]}"), 201)
-                .path("data").path("id").asLong();
-        addImage(modelId, "http://img/thumb.jpg", true);
+        call(post("/api/v1/admin/car-models").content(
+                "{\"brandId\":" + brandId + ",\"name\":\"Camry\",\"categoryIds\":[" + catId + "]}"), 201);
 
         JsonNode item = call(get("/api/v1/admin/car-models?categoryId=" + catId + "&q=cam"), 200)
                 .path("data").path("items").get(0);
         assertThat(item.path("brandName").asText()).isEqualTo("Toyota");
         assertThat(item.path("categories").get(0).path("name").asText()).isEqualTo("Sedan");
-        assertThat(item.path("thumbnailUrl").asText()).isEqualTo("http://img/thumb.jpg");
     }
 
     @Test

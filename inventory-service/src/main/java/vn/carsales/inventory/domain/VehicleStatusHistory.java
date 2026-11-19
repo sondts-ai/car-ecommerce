@@ -5,8 +5,9 @@ import java.time.LocalDateTime;
 import jakarta.persistence.*;
 import vn.carsales.inventory.domain.Enums.VehicleStatus;
 
+/** Bảng inventory_history (bảng cũ không có cột changed_by). */
 @Entity
-@Table(name = "vehicle_status_history")
+@Table(name = "inventory_history")
 public class VehicleStatusHistory {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -20,22 +21,18 @@ public class VehicleStatusHistory {
     private VehicleStatus newStatus;
     @Column(length = 500)
     private String reason;
-    /** Tham chiếu logic auth_db.users.id, có thể NULL (job tự động / dữ liệu cũ). */
-    @Column(name = "changed_by")
-    private Long changedBy;
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @PrePersist void onCreate() { if (createdAt == null) createdAt = LocalDateTime.now(); }
 
     public static VehicleStatusHistory of(Long vehicleId, VehicleStatus oldStatus, VehicleStatus newStatus,
-                                          String reason, Long changedBy) {
+                                          String reason) {
         VehicleStatusHistory h = new VehicleStatusHistory();
         h.vehicleId = vehicleId;
         h.oldStatus = oldStatus;
         h.newStatus = newStatus;
         h.reason = reason;
-        h.changedBy = changedBy;
         return h;
     }
 
@@ -44,6 +41,5 @@ public class VehicleStatusHistory {
     public VehicleStatus getOldStatus() { return oldStatus; }
     public VehicleStatus getNewStatus() { return newStatus; }
     public String getReason() { return reason; }
-    public Long getChangedBy() { return changedBy; }
     public LocalDateTime getCreatedAt() { return createdAt; }
 }

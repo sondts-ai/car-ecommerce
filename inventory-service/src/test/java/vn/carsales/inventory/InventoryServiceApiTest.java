@@ -11,7 +11,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
@@ -35,19 +34,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import vn.carsales.inventory.domain.Branch;
-import vn.carsales.inventory.domain.Enums.HoldStatus;
 import vn.carsales.inventory.domain.Enums.VehicleStatus;
 import vn.carsales.inventory.domain.Vehicle;
-import vn.carsales.inventory.domain.VehicleHold;
 import vn.carsales.inventory.domain.VehicleStatusHistory;
 import vn.carsales.inventory.repository.BranchRepository;
-import vn.carsales.inventory.repository.VehicleHoldRepository;
+import vn.carsales.inventory.repository.InventoryRepository;
 import vn.carsales.inventory.repository.VehicleRepository;
 import vn.carsales.inventory.repository.VehicleStatusHistoryRepository;
 import vn.carsales.inventory.service.CarServiceClient;
 import vn.carsales.inventory.service.CarServiceClient.VersionInfo;
-import vn.carsales.inventory.service.HoldExpiryJob;
-import vn.carsales.inventory.service.HoldService;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -61,9 +56,8 @@ class InventoryServiceApiTest {
     @Autowired ObjectMapper json;
     @Autowired BranchRepository branches;
     @Autowired VehicleRepository vehicles;
-    @Autowired VehicleHoldRepository holds;
+    @Autowired InventoryRepository inventory;
     @Autowired VehicleStatusHistoryRepository history;
-    @Autowired HoldService holdService;
     @MockitoBean CarServiceClient cars;
 
     Branch hanoi;
@@ -109,16 +103,6 @@ class InventoryServiceApiTest {
                 .path("data").path("id").asLong();
     }
 
-    private VehicleHold hold(long vehicleId, HoldStatus st, LocalDateTime expiresAt) {
-        VehicleHold h = new VehicleHold();
-        h.setVehicleId(vehicleId);
-        h.setOrderId(100L + vehicleId);
-        h.setCustomerId(5L);
-        h.setStatus(st);
-        h.setExpiresAt(expiresAt);
-        return holds.saveAndFlush(h);
-    }
-
     private void setStatus(long vehicleId, VehicleStatus st) {
         Vehicle v = vehicles.findById(vehicleId).orElseThrow();
         v.setStatus(st);
@@ -139,7 +123,6 @@ class InventoryServiceApiTest {
         assertThat(h.get(0).getOldStatus()).isNull();
         assertThat(h.get(0).getNewStatus()).isEqualTo(VehicleStatus.AVAILABLE);
         assertThat(h.get(0).getReason()).isEqualTo("Nhập xe");
-        assertThat(h.get(0).getChangedBy()).isEqualTo(ADMIN_ID);
     }
 
     @Test
@@ -186,16 +169,7 @@ class InventoryServiceApiTest {
         assertThat(latest.getOldStatus()).isEqualTo(VehicleStatus.AVAILABLE);
         assertThat(latest.getNewStatus()).isEqualTo(VehicleStatus.MAINTENANCE);
         assertThat(latest.getReason()).isEqualTo("Bảo dưỡng");
-        assertThat(latest.getChangedBy()).isEqualTo(ADMIN_ID);
         assertThat(vehicles.findById(id).orElseThrow().getStatus()).isEqualTo(VehicleStatus.MAINTENANCE);
-    }
-
-    @Test
-    void changeStatusWhileActiveHoldReturns409() throws Exception {
-        long id = createVehicle("JTNB11HK0M3000001", "30A-1");
-        setStatus(id, VehicleStatus.RESERVED);
-        hold(id, HoldStatus.ACTIVE, LocalDateTime.now().plusHours(1));
-        call(patch("/api/v1/admin/vehicles/" + id + "/status").content("{\"status\":\"AVAILABLE\"}"), 409);
     }
 
     @Test
@@ -224,53 +198,6 @@ class InventoryServiceApiTest {
         call(get("/api/v1/admin/vehicles/" + id), 404);
     }
 
-    // ------------------------------------------------------------- hold
-
-    @Test
-    void releaseHoldFreesVehicleAndWritesHistory() throws Exception {
-        long id = createVehicle("JTNB11HK0M3000001", "30A-1");
-        setStatus(id, VehicleStatus.RESERVED);
-        VehicleHold h = hold(id, HoldStatus.ACTIVE, LocalDateTime.now().plusHours(1));
-
-        call(post("/api/v1/admin/holds/" + h.getId() + "/release").content("{\"reason\":\"Khách hủy\"}"), 200);
-
-        VehicleHold after = holds.findById(h.getId()).orElseThrow();
-        assertThat(after.getStatus()).isEqualTo(HoldStatus.RELEASED);
-        assertThat(after.getReleasedReason()).isEqualTo("Khách hủy");
-        assertThat(vehicles.findById(id).orElseThrow().getStatus()).isEqualTo(VehicleStatus.AVAILABLE);
-        VehicleStatusHistory last = history.findByVehicleIdOrderByCreatedAtDescIdDesc(id).stream()
-                .max(java.util.Comparator.comparing(VehicleStatusHistory::getId)).get();
-        assertThat(last.getOldStatus()).isEqualTo(VehicleStatus.RESERVED);
-        assertThat(last.getNewStatus()).isEqualTo(VehicleStatus.AVAILABLE);
-        assertThat(last.getChangedBy()).isEqualTo(ADMIN_ID);
-
-        // chỉ hold ACTIVE mới giải phóng được
-        call(post("/api/v1/admin/holds/" + h.getId() + "/release").content("{}"), 409);
-        call(post("/api/v1/admin/holds/99999/release").content("{}"), 404);
-    }
-
-    @Test
-    void expiryJobReleasesOnlyOverdueHolds() throws Exception {
-        long overdueVehicle = createVehicle("JTNB11HK0M3000001", "30A-1");
-        long freshVehicle = createVehicle("JTNB11HK0M3000002", "30A-2");
-        setStatus(overdueVehicle, VehicleStatus.RESERVED);
-        setStatus(freshVehicle, VehicleStatus.RESERVED);
-        VehicleHold overdue = hold(overdueVehicle, HoldStatus.ACTIVE, LocalDateTime.now().minusMinutes(5));
-        VehicleHold fresh = hold(freshVehicle, HoldStatus.ACTIVE, LocalDateTime.now().plusHours(1));
-
-        new HoldExpiryJob(holdService).run();
-
-        assertThat(holds.findById(overdue.getId()).orElseThrow().getStatus()).isEqualTo(HoldStatus.RELEASED);
-        assertThat(holds.findById(overdue.getId()).orElseThrow().getReleasedReason()).isEqualTo("Hết hạn giữ xe");
-        assertThat(vehicles.findById(overdueVehicle).orElseThrow().getStatus()).isEqualTo(VehicleStatus.AVAILABLE);
-        assertThat(holds.findById(fresh.getId()).orElseThrow().getStatus()).isEqualTo(HoldStatus.ACTIVE);
-        assertThat(vehicles.findById(freshVehicle).orElseThrow().getStatus()).isEqualTo(VehicleStatus.RESERVED);
-        VehicleStatusHistory last = history.findByVehicleIdOrderByCreatedAtDescIdDesc(overdueVehicle).stream()
-                .max(java.util.Comparator.comparing(VehicleStatusHistory::getId)).get();
-        assertThat(last.getNewStatus()).isEqualTo(VehicleStatus.AVAILABLE);
-        assertThat(last.getChangedBy()).isNull();
-    }
-
     // ----------------------------------------------------------- khác
 
     @Test
@@ -278,7 +205,8 @@ class InventoryServiceApiTest {
         long id = createVehicle("JTNB11HK0M3000001", "30A-1");
         call(patch("/api/v1/admin/vehicles/" + id + "/branch")
                 .content("{\"branchId\":" + hcm.getId() + ",\"reason\":\"Điều chuyển\"}"), 200);
-        assertThat(vehicles.findWithBranch(id).orElseThrow().getBranch().getId()).isEqualTo(hcm.getId());
+        assertThat(inventory.findByVehicleId(id).orElseThrow().getBranch().getId()).isEqualTo(hcm.getId());
+        assertThat(inventory.findByVehicleId(id).orElseThrow().getQuantity()).isEqualTo(1);
         call(patch("/api/v1/admin/vehicles/" + id + "/branch").content("{\"branchId\":" + hcm.getId() + "}"), 400);
         call(delete("/api/v1/admin/branches/" + hcm.getId()), 409);
         call(delete("/api/v1/admin/branches/" + hanoi.getId()), 200);
@@ -319,7 +247,5 @@ class InventoryServiceApiTest {
         mvc.perform(get("/api/v1/admin/vehicles")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/v1/admin/vehicles").header("Authorization", "Bearer " + token("CUSTOMER")))
                 .andExpect(status().isForbidden());
-        mvc.perform(post("/api/v1/admin/holds/1/release").contentType(MediaType.APPLICATION_JSON).content("{}"))
-                .andExpect(status().isUnauthorized());
     }
 }

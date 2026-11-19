@@ -5,7 +5,7 @@ spring:
   application:
     name: inventory-service
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/inventory_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh&characterEncoding=utf8}
+    url: ${DB_URL:jdbc:mysql://localhost:3306/vehicle_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh&characterEncoding=utf8}
     username: ${DB_USERNAME:car_app}
     password: ${DB_PASSWORD:CarApp@123}
   jpa:
@@ -26,5 +26,3 @@ app:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
   car-service:
     url: ${CAR_SERVICE_URL:http://localhost:8084}
-  hold-expiry-job:
-    enabled: ${HOLD_EXPIRY_JOB_ENABLED:true}

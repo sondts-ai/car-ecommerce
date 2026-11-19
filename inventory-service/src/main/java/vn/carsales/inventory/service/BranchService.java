@@ -10,17 +10,17 @@ import vn.carsales.inventory.api.InventoryDtos.BranchResponse;
 import vn.carsales.inventory.api.PageResponse;
 import vn.carsales.inventory.domain.Branch;
 import vn.carsales.inventory.repository.BranchRepository;
-import vn.carsales.inventory.repository.VehicleRepository;
+import vn.carsales.inventory.repository.InventoryRepository;
 
 @Service
 public class BranchService {
 
     private final BranchRepository branches;
-    private final VehicleRepository vehicles;
+    private final InventoryRepository inventory;
 
-    public BranchService(BranchRepository branches, VehicleRepository vehicles) {
+    public BranchService(BranchRepository branches, InventoryRepository inventory) {
         this.branches = branches;
-        this.vehicles = vehicles;
+        this.inventory = inventory;
     }
 
     @Transactional(readOnly = true)
@@ -59,7 +59,7 @@ public class BranchService {
     @Transactional
     public void delete(Long id) {
         Branch b = find(id);
-        if (vehicles.existsByBranchId(id)) {
+        if (inventory.existsByBranchId(id)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Không thể xóa chi nhánh còn xe");
         }
         branches.delete(b);

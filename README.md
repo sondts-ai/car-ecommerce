@@ -7,8 +7,8 @@ Hệ thống thương mại điện tử bán ô tô, thiết kế theo kiến t
 ```
 .
 ├── README.md
-├── car-service/         # Spring Boot, cổng 8084, car_db
-├── inventory-service/   # Spring Boot, cổng 8085, inventory_db
+├── car-service/         # Spring Boot, cổng 8084, dùng vehicle_db
+├── inventory-service/   # Spring Boot, cổng 8085, dùng vehicle_db
 ├── postman/             # Postman collection cho API admin
 └── database/
     ├── README.md
@@ -18,10 +18,7 @@ Hệ thống thương mại điện tử bán ô tô, thiết kế theo kiến t
     ├── customer_db/
     │   ├── schema.sql
     │   └── seed.sql
-    ├── car_db/
-    │   ├── schema.sql
-    │   └── seed.sql
-    ├── inventory_db/
+    ├── vehicle_db/
     │   ├── schema.sql
     │   └── seed.sql
     ├── order_db/
@@ -38,15 +35,15 @@ Hệ thống thương mại điện tử bán ô tô, thiết kế theo kiến t
 |---|---|---|
 | Auth Service | `auth_db` | Tài khoản, vai trò, phân quyền |
 | Customer Service | `customer_db` | Hồ sơ khách hàng, sổ địa chỉ |
-| Car Service (cổng 8084) | `car_db` | Danh mục xe: hãng, phân loại, dòng xe, phiên bản, ảnh dòng xe |
-| Inventory Service (cổng 8085) | `inventory_db` | Từng chiếc xe, chi nhánh, giữ xe, lịch sử trạng thái |
+| Vehicle Service | `vehicle_db` | Danh mục xe, từng chiếc xe, tồn kho |
 | Order Service | `order_db` | Giỏ hàng, đơn hàng, đặt cọc, giữ xe |
 | Payment Service | `payment_db` | Thanh toán, giao dịch, hoàn tiền |
 
 ## Chạy backend admin
 
-Yêu cầu Java 17+, Maven, MySQL 8 (đã chạy `schema.sql` + `seed.sql` của `car_db`, `inventory_db`). Chi tiết và biến
-môi trường xem [`car-service/README.md`](./car-service/README.md) và [`inventory-service/README.md`](./inventory-service/README.md).
+Yêu cầu Java 17+, Maven, MySQL 8 (đã chạy `schema.sql` + `seed.sql` của `vehicle_db`). Hai service dùng chung
+database `vehicle_db` (không đổi cấu trúc DB). Chi tiết và biến môi trường xem
+[`car-service/README.md`](./car-service/README.md) và [`inventory-service/README.md`](./inventory-service/README.md).
 
 ```bash
 cd car-service && mvn spring-boot:run          # http://localhost:8084/swagger-ui.html

@@ -32,10 +32,6 @@
     {
       "key": "versionId",
       "value": ""
-    },
-    {
-      "key": "imageId",
-      "value": ""
     }
   ],
   "item": [
@@ -1432,6 +1428,42 @@
           ]
         },
         {
+          "name": "Xóa phiên bản đang có xe - 409",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{carBaseUrl}}/api/v1/admin/versions/1",
+              "host": [
+                "{{carBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "versions",
+                "1"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", function () { pm.response.to.have.status(409); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Internal: phiên bản không tồn tại - 404",
           "request": {
             "method": "GET",
@@ -1462,222 +1494,6 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });"
-                ]
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "Images",
-      "item": [
-        {
-          "name": "Thêm ảnh - 201",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{carBaseUrl}}/api/v1/admin/car-models/{{modelId}}/images",
-              "host": [
-                "{{carBaseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "admin",
-                "car-models",
-                "{{modelId}}",
-                "images"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"imageUrl\": \"https://x/1.jpg\",\n  \"isThumbnail\": true,\n  \"sortOrder\": 1\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
-                  "pm.collectionVariables.set(\"imageId\", pm.response.json().data.id);"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Thêm ảnh thiếu URL - 400",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{carBaseUrl}}/api/v1/admin/car-models/{{modelId}}/images",
-              "host": [
-                "{{carBaseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "admin",
-                "car-models",
-                "{{modelId}}",
-                "images"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"imageUrl\": \"\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Đặt thumbnail - 200",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{carBaseUrl}}/api/v1/admin/car-images/{{imageId}}/thumbnail",
-              "host": [
-                "{{carBaseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "admin",
-                "car-images",
-                "{{imageId}}",
-                "thumbnail"
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Đặt thumbnail ảnh không tồn tại - 404",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{carBaseUrl}}/api/v1/admin/car-images/999999/thumbnail",
-              "host": [
-                "{{carBaseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "admin",
-                "car-images",
-                "999999",
-                "thumbnail"
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Xóa ảnh - 200",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{adminToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{carBaseUrl}}/api/v1/admin/car-images/{{imageId}}",
-              "host": [
-                "{{carBaseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "admin",
-                "car-images",
-                "{{imageId}}"
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
                 ]
               }
             }
