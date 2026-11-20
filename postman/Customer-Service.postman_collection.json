@@ -1,0 +1,38 @@
+{
+  "info": {
+    "name": "Car Sales - Customer Service",
+    "description": "Customer profile and address APIs. Obtain customerToken from Auth Service first. Run profile-create only for a user without a customers row.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "customerBaseUrl", "value": "http://localhost:8082" },
+    { "key": "customerToken", "value": "" },
+    { "key": "otherCustomerToken", "value": "" },
+    { "key": "addressId", "value": "1" },
+    { "key": "otherAddressId", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "Profile",
+      "item": [
+        { "name": "Get my profile (also verifies Auth REST integration)", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{customerBaseUrl}}/api/v1/customers/me" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('profile returned', () => pm.response.to.have.status(200));", "pm.test('account identity came from Auth', () => pm.expect(pm.response.json().data.account.userId).to.be.a('number'));"] } }] },
+        { "name": "Create my profile (new customer only)", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"fullName\": \"Customer Name\",\n  \"birthday\": \"1995-08-20\",\n  \"gender\": \"OTHER\"\n}" }, "url": "{{customerBaseUrl}}/api/v1/customers/me" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('profile created', () => pm.response.to.have.status(201));"] } }] },
+        { "name": "Update my profile", "request": { "method": "PUT", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"fullName\": \"Updated Customer\",\n  \"birthday\": \"1995-08-20\",\n  \"gender\": \"OTHER\"\n}" }, "url": "{{customerBaseUrl}}/api/v1/customers/me" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('profile updated', () => pm.response.to.have.status(200));"] } }] },
+        { "name": "Unauthenticated profile is rejected", "request": { "method": "GET", "url": "{{customerBaseUrl}}/api/v1/customers/me" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('unauthenticated request rejected', () => pm.response.to.have.status(401));"] } }] }
+      ]
+    },
+    {
+      "name": "Addresses",
+      "item": [
+        { "name": "List my addresses", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{customerBaseUrl}}/api/v1/customers/me/addresses" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('addresses listed', () => pm.response.to.have.status(200));"] } }] },
+        { "name": "Add address (saves addressId)", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"receiverName\": \"Customer Name\",\n  \"phone\": \"0912345678\",\n  \"address\": \"Address entered for this test\",\n  \"isDefault\": true\n}" }, "url": "{{customerBaseUrl}}/api/v1/customers/me/addresses" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('address created', () => pm.response.to.have.status(201));", "pm.collectionVariables.set('addressId', pm.response.json().data.id);"] } }] },
+        { "name": "Update my address", "request": { "method": "PUT", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"receiverName\": \"Updated Receiver\",\n  \"phone\": \"0912345678\",\n  \"address\": \"Updated address entered for this test\",\n  \"isDefault\": false\n}" }, "url": "{{customerBaseUrl}}/api/v1/customers/me/addresses/{{addressId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('address updated', () => pm.response.to.have.status(200));"] } }] },
+        { "name": "Set address default", "request": { "method": "PUT", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{customerBaseUrl}}/api/v1/customers/me/addresses/{{addressId}}/default" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('default updated', () => pm.response.to.have.status(200));", "pm.expect(pm.response.json().data.isDefault).to.eql(true);"] } }] },
+        { "name": "Get default address", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{customerBaseUrl}}/api/v1/customers/me/addresses/default" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('default address returned', () => pm.response.to.have.status(200));"] } }] },
+        { "name": "Create address for second customer (ownership test setup)", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{otherCustomerToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"receiverName\": \"Second Customer\",\n  \"phone\": \"0912345679\",\n  \"address\": \"Address owned by second customer\",\n  \"isDefault\": false\n}" }, "url": "{{customerBaseUrl}}/api/v1/customers/me/addresses" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test(\"second customer's address created\", () => pm.response.to.have.status(201));", "pm.collectionVariables.set('otherAddressId', pm.response.json().data.id);"] } }] },
+        { "name": "Cannot access another customer's address", "request": { "method": "PUT", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"receiverName\": \"Unauthorized edit\",\n  \"phone\": \"0912345678\",\n  \"address\": \"Should not be applied\",\n  \"isDefault\": false\n}" }, "url": "{{customerBaseUrl}}/api/v1/customers/me/addresses/{{otherAddressId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('foreign address hidden', () => pm.response.to.have.status(404));"] } }] },
+        { "name": "Delete my address", "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{customerBaseUrl}}/api/v1/customers/me/addresses/{{addressId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('address deleted', () => pm.response.to.have.status(200));"] } }] }
+      ]
+    }
+  ]
+}
