@@ -1,70 +1,55 @@
 # Car E-commerce
 
-Hệ thống thương mại điện tử bán ô tô, thiết kế theo kiến trúc microservices.
+Hệ thống thương mại điện tử bán ô tô gồm frontend Next.js và các backend
+Spring Boot theo kiến trúc microservices.
 
 ## Cấu trúc repository
 
-```
-.
-├── README.md
-├── car-service/         # Spring Boot, cổng 8084, dùng vehicle_db
-├── inventory-service/   # Spring Boot, cổng 8085, dùng vehicle_db
-├── postman/             # Postman collection cho API admin
-└── database/
-    ├── README.md
-    ├── auth_db/
-    │   ├── schema.sql
-    │   └── seed.sql
-    ├── customer_db/
-    │   ├── schema.sql
-    │   └── seed.sql
-    ├── vehicle_db/
-    │   ├── schema.sql
-    │   └── seed.sql
-    ├── order_db/
-    │   ├── schema.sql
-    │   └── seed.sql
-    └── payment_db/
-        ├── schema.sql
-        └── seed.sql
-```
+| Thành phần | Thư mục | Cổng mặc định |
+|---|---|---:|
+| Frontend khách hàng | `app/`, `components/`, `lib/` | 3000 |
+| Auth Service | `auth-service/` | 8081 |
+| Customer Service | `customer-service/` | 8082 |
+| Order Service | `order-service/` | 8083 |
+| Car Service (admin) | `car-service/` | 8084 |
+| Inventory Service (admin) | `inventory-service/` | 8085 |
+| Database scripts | `database/` | — |
 
-## Các service và database
+## Chạy backend
 
-| Service | Database | Chức năng |
-|---|---|---|
-| Auth Service | `auth_db` | Tài khoản, vai trò, phân quyền |
-| Customer Service | `customer_db` | Hồ sơ khách hàng, sổ địa chỉ |
-| Vehicle Service | `vehicle_db` | Danh mục xe, từng chiếc xe, tồn kho |
-| Order Service | `order_db` | Giỏ hàng, đơn hàng, đặt cọc, giữ xe |
-| Payment Service | `payment_db` | Thanh toán, giao dịch, hoàn tiền |
-
-## Chạy backend admin
-
-Yêu cầu Java 17+, Maven, MySQL 8 (đã chạy `schema.sql` + `seed.sql` của `vehicle_db`). Hai service dùng chung
-database `vehicle_db` (không đổi cấu trúc DB). Chi tiết và biến môi trường xem
-[`car-service/README.md`](./car-service/README.md) và [`inventory-service/README.md`](./inventory-service/README.md).
+Yêu cầu Java 17+, Maven và MySQL 8. Chạy các schema/seed trong
+[`database/README.md`](./database/README.md), sau đó cấu hình `JWT_SECRET` và
+thông tin kết nối database theo README của từng service.
 
 ```bash
-cd car-service && mvn spring-boot:run          # http://localhost:8084/swagger-ui.html
-cd inventory-service && mvn spring-boot:run    # http://localhost:8085/swagger-ui.html
+cd auth-service && mvn spring-boot:run
+cd customer-service && mvn spring-boot:run
+cd order-service && mvn spring-boot:run
+cd car-service && mvn spring-boot:run
+cd inventory-service && mvn spring-boot:run
 ```
 
-Collection Postman: `postman/Admin-Car-Service.postman_collection.json`, `postman/Admin-Inventory-Service.postman_collection.json`
-(điền `adminToken`, `customerToken`).
+Auth, customer và order dùng API `/api/v1`; car và inventory cung cấp API quản
+trị tại `/api/v1/admin`. Các collection Postman nằm trong `postman/`.
 
-## Bắt đầu
+## Chạy frontend
 
-Xem hướng dẫn chi tiết tại [`database/README.md`](./database/README.md):
+```bash
+cp .env.example .env.local
+npm install
+npm run dev
+```
 
-- Thứ tự chạy `schema.sql` / `seed.sql`
-- Thông tin kết nối MySQL
-- Mô tả chi tiết từng bảng và ràng buộc
-- Dữ liệu mẫu
+Mặc định frontend dùng mock API tại `/api` để toàn bộ giao diện chạy độc lập.
+Để gọi backend thật, đặt `NEXT_PUBLIC_USE_MOCK_API=false` và
+`NEXT_PUBLIC_API_BASE_URL` tới API gateway/reverse proxy có định tuyến các
+service backend. Các endpoint backend hiện có được mô tả trong README của
+`auth-service`, `customer-service`, `order-service`, `car-service` và
+`inventory-service`; các luồng thanh toán, đặt cọc và lái thử vẫn dùng mock cho
+đến khi có service tương ứng.
 
 ## Công nghệ
 
-- MySQL 8.0+
-- InnoDB, utf8mb4
-- Kiến trúc microservices: mỗi service sở hữu database riêng, tham chiếu xuyên
-  service bằng ID logic (không dùng khóa ngoại vật lý xuyên database)
+- Frontend: Next.js 15, React 19, TypeScript, Tailwind CSS
+- Backend: Spring Boot, Spring Data JPA, JWT
+- Database: MySQL 8, InnoDB, utf8mb4
