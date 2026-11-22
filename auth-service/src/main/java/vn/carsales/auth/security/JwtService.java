@@ -12,6 +12,10 @@ import vn.carsales.auth.domain.UserAccount;
 
 @Service
 public class JwtService {
+    /** Thứ tự ưu tiên khi tài khoản có nhiều role (ADMIN > STAFF > CUSTOMER). */
+    private static final java.util.List<String> ROLE_PRIORITY =
+            java.util.List.of("ADMIN", "STAFF", "CUSTOMER");
+
     private final SecretKey key;
     private final String issuer;
     private final long ttl;
@@ -23,7 +27,11 @@ public class JwtService {
     }
     public String issue(UserAccount user) {
         Instant now = Instant.now();
-        String role = user.getRoles().stream().map(r -> r.getName()).filter("CUSTOMER"::equals).findFirst().orElse("CUSTOMER");
+        // Giữ đúng role của tài khoản (seed ADMIN phải nhận token ADMIN, không bị hạ thành CUSTOMER).
+        String role = user.getRoles().stream().map(r -> r.getName())
+                .filter(ROLE_PRIORITY::contains)
+                .min(java.util.Comparator.comparingInt(ROLE_PRIORITY::indexOf))
+                .orElse("CUSTOMER");
         return Jwts.builder().issuer(issuer).subject(user.getEmail()).claim("userId", user.getId()).claim("role", role)
                 .issuedAt(Date.from(now)).expiration(Date.from(now.plusMillis(ttl))).signWith(key).compact();
     }

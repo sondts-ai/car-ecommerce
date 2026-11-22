@@ -11,6 +11,7 @@ import vn.carsales.auth.api.AuthDtos.*;
 import vn.carsales.auth.domain.*;
 import vn.carsales.auth.repository.*;
 import vn.carsales.auth.security.JwtService;
+import vn.carsales.auth.client.CustomerProfileClient;
 import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -22,10 +23,11 @@ class AuthServiceTest {
     @Mock RoleRepository roles;
     @Mock PasswordEncoder encoder;
     @Mock JwtService jwt;
+    @Mock CustomerProfileClient profiles;
     @InjectMocks AuthService service;
 
     @Test void registerStoresBCryptHashAndServerAssignedCustomerRole() {
-        Role customer=mock(Role.class); when(customer.getName()).thenReturn("CUSTOMER");
+        Role customer=mock(Role.class);
         when(roles.findByName("CUSTOMER")).thenReturn(Optional.of(customer));
         when(encoder.encode("password123")).thenReturn("$2b$hash");
         when(users.existsByEmailIgnoreCase("buyer@example.com")).thenReturn(false);
@@ -37,6 +39,7 @@ class AuthServiceTest {
         assertEquals("Buyer Name",result.fullName());
         assertEquals("CUSTOMER",result.role());
         verify(users).saveAndFlush(argThat(u -> "$2b$hash".equals(u.getPasswordHash()) && u.getRoles().contains(customer)));
+        verify(profiles).createProfileQuietly(any(), eq("Buyer Name"));
     }
 
     @Test void loginIssuesJwtForActiveAccount() {

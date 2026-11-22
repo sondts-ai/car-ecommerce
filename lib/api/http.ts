@@ -31,6 +31,7 @@ export type RequestOptions = {
   timeout?: number;
   signal?: AbortSignal;
   cache?: RequestCache;
+  baseUrl?: string;
 };
 
 export type ApiResult<T> = {
@@ -53,9 +54,9 @@ export function buildQuery(params: Record<string, string | number | boolean | st
   return query ? `?${query}` : "";
 }
 
-function resolveUrl(path: string): string {
+function resolveUrl(path: string, baseUrl = API_CONFIG.baseUrl): string {
   if (/^https?:\/\//i.test(path)) return path;
-  const base = API_CONFIG.baseUrl;
+  const base = baseUrl;
   if (/^https?:\/\//i.test(base)) {
     return `${base}${path.startsWith("/") ? path : `/${path}`}`;
   }
@@ -71,7 +72,7 @@ function resolveUrl(path: string): string {
  * Tự gắn Bearer token, timeout, và chuẩn hoá lỗi thành `ApiError`.
  */
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<ApiResult<T>> {
-  const { method = "GET", body, headers = {}, skipAuth, timeout, signal, cache } = options;
+  const { method = "GET", body, headers = {}, skipAuth, timeout, signal, cache, baseUrl } = options;
   const controller = new AbortController();
   const timeoutMs = timeout ?? API_CONFIG.timeout;
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -85,7 +86,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 
   let response: Response;
   try {
-    response = await fetch(resolveUrl(path), {
+    response = await fetch(resolveUrl(path, baseUrl), {
       method,
       headers: {
         Accept: "application/json",
@@ -118,13 +119,18 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 
   if (!response.ok || !payload || payload.success === false) {
     const failure = payload && payload.success === false ? (payload as ApiFailure) : null;
+    const backendMessage =
+      payload && typeof (payload as { message?: unknown }).message === "string"
+        ? (payload as { message: string }).message
+        : undefined;
     throw new ApiError({
       status: response.status,
-      code: failure?.error.code ?? (response.status === 401 ? "UNAUTHORIZED" : "INTERNAL_ERROR"),
+      code: failure?.error?.code ?? (response.status === 401 ? "UNAUTHORIZED" : "INTERNAL_ERROR"),
       message:
-        failure?.error.message ??
+        failure?.error?.message ??
+        backendMessage ??
         `Máy chủ trả về lỗi ${response.status}. Vui lòng thử lại sau.`,
-      details: failure?.error.details,
+      details: failure?.error?.details,
     });
   }
 

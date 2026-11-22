@@ -182,8 +182,11 @@ export function DepositForm({ car }: DepositFormProps) {
       /* UC: Tạo đơn đặt cọc — backend kiểm tra tồn kho và giữ xe */
       const created = await depositsApi.create({
         carSlug: car.slug,
+        carName: car.name,
+        vin: "PENDING",
         showroomId: form.showroomId,
         amount: depositAmount,
+        totalAmount: car.price,
         note: form.note.trim() || undefined,
         customer: {
           fullName: form.fullName.trim(),
@@ -213,6 +216,8 @@ export function DepositForm({ car }: DepositFormProps) {
       const intent = await paymentsApi.createIntent({
         depositId: deposit.id,
         method: form.paymentMethod,
+        orderId: Number(deposit.id),
+        amount: deposit.amount,
       });
       await paymentsApi.confirm(intent.id);
       setStep(3);

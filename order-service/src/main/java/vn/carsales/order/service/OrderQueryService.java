@@ -10,6 +10,8 @@ import vn.carsales.order.domain.*;
 import vn.carsales.order.repository.*;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.time.Duration;
+import java.time.LocalDateTime;
 
 @Service
 public class OrderQueryService {
@@ -64,6 +66,40 @@ public class OrderQueryService {
         Long customerId=customerIdentity.customerId(userId,token);ownedOrder(orderId,customerId);
         return history.findAllByOrderIdOrderByCreatedAtAsc(orderId).stream()
                 .map(h->new StatusHistoryView(h.getOldStatus(),h.getNewStatus(),h.getNote(),h.getChangedBy(),h.getCreatedAt())).toList();
+    }
+    @Transactional
+    public OrderView createOrder(Long userId,String token,CreateOrderRequest request){
+        Long customerId=customerIdentity.customerId(userId,token);
+        if(request.depositAmount().compareTo(request.price())>0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Deposit cannot exceed order total");
+        CustomerOrder order=new CustomerOrder();
+        order.setOrderCode("ORD-"+UUID.randomUUID().toString().replace("-","").substring(0,12).toUpperCase());
+        order.setCustomerId(customerId); order.setSubtotal(request.price()); order.setTotalAmount(request.price());
+        order.setDepositAmount(request.depositAmount()); order.setRemainingAmount(request.price().subtract(request.depositAmount()));
+        order.setStatus(OrderStatus.PENDING_DEPOSIT);
+        order.setReservedUntil(LocalDateTime.now().plusMinutes(request.reservationMinutes()==null?15:request.reservationMinutes()));
+        order.setNote(request.note());
+        CustomerOrder saved=orders.save(order);
+        OrderItem item=new OrderItem(); item.setOrderId(saved.getId()); item.setVehicleId(request.vehicleId());
+        item.setVehicleName(request.vehicleName()); item.setVin(request.vin()); item.setPrice(request.price()); orderItems.save(item);
+        OrderStatusHistory change=new OrderStatusHistory(); change.setOrderId(saved.getId()); change.setNewStatus(OrderStatus.PENDING_DEPOSIT);
+        change.setNote("Order created"); history.save(change);
+        return orderView(saved,List.of(item).stream().map(this::itemView).toList());
+    }
+    @Transactional
+    public void markDepositPaid(Long orderId,String paymentReference){
+        CustomerOrder order=orders.findById(orderId).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Order not found"));
+        if(order.getStatus()==OrderStatus.DEPOSIT_PAID)return;
+        if(order.getStatus()!=OrderStatus.PENDING_DEPOSIT)
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"Order is not awaiting deposit");
+        OrderStatus old=order.getStatus(); order.setStatus(OrderStatus.DEPOSIT_PAID); orders.save(order);
+        OrderStatusHistory change=new OrderStatusHistory(); change.setOrderId(orderId); change.setOldStatus(old);
+        change.setNewStatus(OrderStatus.DEPOSIT_PAID); change.setNote("Deposit paid: "+paymentReference); history.save(change);
+    }
+    @Transactional(readOnly=true)
+    public OrderOwnershipView verifyOwnership(Long orderId,Long customerId){
+        CustomerOrder order=ownedOrder(orderId,customerId);
+        return new OrderOwnershipView(order.getId(),order.getCustomerId(),order.getDepositAmount(),order.getTotalAmount());
     }
     private Cart activeCart(Long customerId){return carts.findByCustomerIdAndStatus(customerId,CartStatus.ACTIVE).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Active cart not found"));}
     private CustomerOrder ownedOrder(Long orderId,Long customerId){return orders.findByIdAndCustomerId(orderId,customerId).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Order not found"));}

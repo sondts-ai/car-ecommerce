@@ -75,6 +75,7 @@ export function RegisterForm() {
         email: form.email.trim(),
         phone: form.phone,
         password: form.password,
+        confirmPassword: form.confirmPassword,
       });
       setSuccess(true);
     } catch (error) {
@@ -97,8 +98,8 @@ export function RegisterForm() {
         </span>
         <h3 className="mt-4 font-display text-2xl text-ink-950">Tạo tài khoản thành công</h3>
         <p className="mt-2 text-sm leading-relaxed text-ink-600/75">
-          Mã xác thực đã được gửi tới <span className="font-medium text-ink-900">{form.email}</span>. Vui lòng
-          kiểm tra hộp thư để kích hoạt tài khoản.
+          Tài khoản <span className="font-medium text-ink-900">{form.email}</span> đã được tạo. Vui lòng đăng nhập
+          để tiếp tục.
         </p>
         <Link href="/login" className="btn-primary mt-6 w-full">
           Đi tới đăng nhập

@@ -19,7 +19,7 @@ export function LoginForm() {
     event.preventDefault();
     setError("");
     if (!identifier.trim() || !password) {
-      setError("Vui lòng nhập đầy đủ email/số điện thoại và mật khẩu.");
+      setError("Vui lòng nhập đầy đủ email và mật khẩu.");
       return;
     }
     if (password.length < 6) {
@@ -48,7 +48,7 @@ export function LoginForm() {
 
       <div>
         <label htmlFor="login-id" className="field-label">
-          Email hoặc số điện thoại
+          Email
         </label>
         <div className="relative">
           <MailIcon className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-600/45" />

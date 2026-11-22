@@ -1,0 +1,29 @@
+# Chạy Jenkins bằng Docker cho CI của Car E-commerce.
+#
+#   export DOCKER_GID=$(stat -c '%g' /var/run/docker.sock)
+#   docker compose -f docker-compose.jenkins.yml up -d --build
+#   docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
+#
+# Mở http://localhost:9090  (không dùng 8080 vì gateway của app đang giữ cổng đó)
+name: car-ecommerce-jenkins
+
+services:
+  jenkins:
+    build:
+      context: ./jenkins
+    image: car-ecommerce-jenkins:local
+    container_name: jenkins
+    ports:
+      - "9090:8080"     # UI Jenkins
+      - "50000:50000"   # inbound agent (để trống nếu không dùng)
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      # Cho phép Jenkins dùng Docker daemon của máy host để build/push image.
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      # GID của /var/run/docker.sock, truyền qua biến DOCKER_GID.
+      - "${DOCKER_GID:-999}"
+    restart: unless-stopped
+
+volumes:
+  jenkins_home:

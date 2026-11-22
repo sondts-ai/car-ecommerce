@@ -5,4 +5,5 @@ export { carsApi } from "./services/cars.service";
 export { authApi } from "./services/auth.service";
 export { depositsApi, paymentsApi, testDrivesApi } from "./services/bookings.service";
 export { profileApi } from "./services/profile.service";
+export { ordersApi } from "./services/orders.service";
 export { getAccessToken, getRefreshToken, setTokens, clearTokens, hasSession } from "./token";

@@ -13,16 +13,18 @@ import {
   type FormErrors,
 } from "@/lib/booking";
 import {
+  API_CONFIG,
   authApi,
   clearTokens,
   depositsApi,
   getErrorDetails,
   getErrorMessage,
   hasSession,
+  ordersApi,
   profileApi,
   testDrivesApi,
 } from "@/lib/api";
-import type { DepositDto, DepositStatus, TestDriveDto, TestDriveStatus } from "@/lib/api/types";
+import type { DepositDto, DepositStatus, OrderDto, TestDriveDto, TestDriveStatus } from "@/lib/api/types";
 import {
   CalendarIcon,
   CheckIcon,
@@ -136,6 +138,33 @@ function toTestDriveRow(testDrive: TestDriveDto): BookingRow {
   };
 }
 
+const ORDER_STATUS_META: Record<OrderDto["status"], { label: string; tone: string }> = {
+  PENDING_DEPOSIT: { label: "Chờ đặt cọc", tone: "bg-amber-100 text-amber-800" },
+  DEPOSIT_PAID: { label: "Đã đặt cọc", tone: "bg-emerald-500/12 text-emerald-700" },
+  CONFIRMED: { label: "Đã xác nhận", tone: "bg-emerald-500/12 text-emerald-700" },
+  WAITING_REMAINING_PAYMENT: { label: "Chờ thanh toán", tone: "bg-amber-100 text-amber-800" },
+  COMPLETED: { label: "Hoàn tất", tone: "bg-ink-950/8 text-ink-800" },
+  CANCELLED: { label: "Đã huỷ", tone: "bg-ink-950/8 text-ink-600" },
+  EXPIRED: { label: "Đã hết hạn", tone: "bg-ink-950/8 text-ink-600" },
+  REFUNDED: { label: "Đã hoàn tiền", tone: "bg-ink-950/8 text-ink-600" },
+};
+
+function toOrderRow(order: OrderDto): BookingRow {
+  const item = order.items[0];
+  const car = CARS.find((candidate) => candidate.name === item?.vehicleName) ?? CARS[0];
+  const meta = ORDER_STATUS_META[order.status];
+  return {
+    id: order.orderCode,
+    type: "Đặt cọc",
+    car,
+    status: meta.label,
+    statusTone: meta.tone,
+    detail: `${formatVnd(order.depositAmount)} · Mã xe ${item?.vehicleId ?? "—"}`,
+    date: formatCreatedAt(order.createdAt),
+    price: Number(item?.price ?? order.totalAmount),
+  };
+}
+
 type ProfileState = {
   fullName: string;
   phone: string;
@@ -202,14 +231,16 @@ export function ProfileDashboard() {
         });
         setLastUpdated(formatCreatedAt(me.updatedAt));
 
-        const [depositsResult, testDrivesResult] = await Promise.allSettled([
+        const [depositsResult, testDrivesResult, ordersResult] = await Promise.allSettled([
           depositsApi.list(),
           testDrivesApi.list(),
+          ordersApi.list(),
         ]);
         if (cancelled) return;
         const rows: BookingRow[] = [];
         if (depositsResult.status === "fulfilled") rows.push(...depositsResult.value.map(toDepositRow));
         if (testDrivesResult.status === "fulfilled") rows.push(...testDrivesResult.value.map(toTestDriveRow));
+        if (ordersResult.status === "fulfilled") rows.push(...ordersResult.value.map(toOrderRow));
         setBookings(rows.length > 0 ? rows : []);
       } catch (error) {
         if (!cancelled) {
@@ -262,7 +293,9 @@ export function ProfileDashboard() {
     if (phoneError) nextErrors.phone = phoneError;
     const emailError = validateEmail(profile.email, true);
     if (emailError) nextErrors.email = emailError;
-    if (!profile.address.trim()) nextErrors.address = "Vui lòng nhập địa chỉ liên hệ.";
+    if (!API_CONFIG.useBackendServices && !profile.address.trim()) {
+      nextErrors.address = "Vui lòng nhập địa chỉ liên hệ.";
+    }
     setProfileErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
@@ -506,6 +539,7 @@ export function ProfileDashboard() {
                         type="tel"
                         value={profile.phone}
                         onChange={(event) => updateProfile("phone", event.target.value)}
+                        disabled={API_CONFIG.useBackendServices}
                         className={`field pl-11 ${profileErrors.phone ? "field-error" : ""}`}
                       />
                     </div>
@@ -520,6 +554,7 @@ export function ProfileDashboard() {
                         type="email"
                         value={profile.email}
                         onChange={(event) => updateProfile("email", event.target.value)}
+                        disabled={API_CONFIG.useBackendServices}
                         className={`field pl-11 ${profileErrors.email ? "field-error" : ""}`}
                       />
                     </div>
@@ -535,52 +570,58 @@ export function ProfileDashboard() {
                       className="field"
                     />
                   </div>
-                  <div className="sm:col-span-2">
-                    <label htmlFor="pf-address" className="field-label">Địa chỉ liên hệ</label>
-                    <div className="relative">
-                      <MapPinIcon className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-600/45" />
-                      <input
-                        id="pf-address"
-                        value={profile.address}
-                        onChange={(event) => updateProfile("address", event.target.value)}
-                        className={`field pl-11 ${profileErrors.address ? "field-error" : ""}`}
-                      />
-                    </div>
-                    {profileErrors.address && <p className="field-error-text">{profileErrors.address}</p>}
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label htmlFor="pf-city" className="field-label">Tỉnh / Thành phố</label>
-                    <select
-                      id="pf-city"
-                      value={profile.city}
-                      onChange={(event) => updateProfile("city", event.target.value)}
-                      className="field"
-                    >
-                      {["Hà Nội", "TP. Hồ Chí Minh", "Đà Nẵng", "Hải Phòng", "Cần Thơ", "Khác"].map((city) => (
-                        <option key={city} value={city}>{city}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {!API_CONFIG.useBackendServices && (
+                    <>
+                      <div className="sm:col-span-2">
+                        <label htmlFor="pf-address" className="field-label">Địa chỉ liên hệ</label>
+                        <div className="relative">
+                          <MapPinIcon className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-600/45" />
+                          <input
+                            id="pf-address"
+                            value={profile.address}
+                            onChange={(event) => updateProfile("address", event.target.value)}
+                            className={`field pl-11 ${profileErrors.address ? "field-error" : ""}`}
+                          />
+                        </div>
+                        {profileErrors.address && <p className="field-error-text">{profileErrors.address}</p>}
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label htmlFor="pf-city" className="field-label">Tỉnh / Thành phố</label>
+                        <select
+                          id="pf-city"
+                          value={profile.city}
+                          onChange={(event) => updateProfile("city", event.target.value)}
+                          className="field"
+                        >
+                          {["Hà Nội", "TP. Hồ Chí Minh", "Đà Nẵng", "Hải Phòng", "Cần Thơ", "Khác"].map((city) => (
+                            <option key={city} value={city}>{city}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </>
+                  )}
                 </div>
 
-                <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-cream-100 p-4 text-[12px] leading-relaxed text-ink-700">
-                  <span
-                    className={`mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border transition ${
-                      profile.newsletter ? "border-ink-950 bg-ink-950 text-cream-50" : "border-cream-300 bg-white"
-                    }`}
-                  >
-                    {profile.newsletter && <CheckIcon className="h-3 w-3" strokeWidth={3} />}
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={profile.newsletter}
-                    onChange={(event) => updateProfile("newsletter", event.target.checked)}
-                    className="sr-only"
-                  />
-                  <span>
-                    Nhận email về ưu đãi, xe mới ra mắt và lời mời trải nghiệm đặc biệt từ AutoWeb.
-                  </span>
-                </label>
+                {!API_CONFIG.useBackendServices && (
+                  <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-cream-100 p-4 text-[12px] leading-relaxed text-ink-700">
+                    <span
+                      className={`mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border transition ${
+                        profile.newsletter ? "border-ink-950 bg-ink-950 text-cream-50" : "border-cream-300 bg-white"
+                      }`}
+                    >
+                      {profile.newsletter && <CheckIcon className="h-3 w-3" strokeWidth={3} />}
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={profile.newsletter}
+                      onChange={(event) => updateProfile("newsletter", event.target.checked)}
+                      className="sr-only"
+                    />
+                    <span>
+                      Nhận email về ưu đãi, xe mới ra mắt và lời mời trải nghiệm đặc biệt từ AutoWeb.
+                    </span>
+                  </label>
+                )}
 
                 <div className="flex flex-col-reverse gap-3 border-t border-cream-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-[11px] text-ink-600/55">

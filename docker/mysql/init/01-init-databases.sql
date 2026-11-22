@@ -1,0 +1,10 @@
+SOURCE /docker-entrypoint-initdb.d/database/auth_db/schema.sql;
+SOURCE /docker-entrypoint-initdb.d/database/auth_db/seed.sql;
+SOURCE /docker-entrypoint-initdb.d/database/customer_db/schema.sql;
+SOURCE /docker-entrypoint-initdb.d/database/customer_db/seed.sql;
+SOURCE /docker-entrypoint-initdb.d/database/vehicle_db/schema.sql;
+SOURCE /docker-entrypoint-initdb.d/database/vehicle_db/seed.sql;
+SOURCE /docker-entrypoint-initdb.d/database/order_db/schema.sql;
+SOURCE /docker-entrypoint-initdb.d/database/order_db/seed.sql;
+SOURCE /docker-entrypoint-initdb.d/database/payment_db/schema.sql;
+SOURCE /docker-entrypoint-initdb.d/database/payment_db/seed.sql;

@@ -9,6 +9,19 @@ export const API_CONFIG = {
   baseUrl: (process.env.NEXT_PUBLIC_API_BASE_URL || "/api").replace(/\/+$/, ""),
   timeout: Number(process.env.NEXT_PUBLIC_API_TIMEOUT || 15_000),
   useMockApi: (process.env.NEXT_PUBLIC_USE_MOCK_API ?? "true") !== "false",
+  useBackendServices: (process.env.NEXT_PUBLIC_USE_BACKEND_SERVICES ?? "true") !== "false",
+  services: {
+    auth: (process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:8081/api/v1").replace(/\/+$/, ""),
+    customer: (process.env.NEXT_PUBLIC_CUSTOMER_API_URL || "http://localhost:8082/api/v1").replace(
+      /\/+$/,
+      "",
+    ),
+    order: (process.env.NEXT_PUBLIC_ORDER_API_URL || "http://localhost:8083/api/v1").replace(/\/+$/, ""),
+    payment: (process.env.NEXT_PUBLIC_PAYMENT_API_URL || "http://localhost:8086/api/v1").replace(
+      /\/+$/,
+      "",
+    ),
+  },
   tokenStorageKey: "autoweb.access_token",
   refreshTokenStorageKey: "autoweb.refresh_token",
 } as const;

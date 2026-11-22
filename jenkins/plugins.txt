@@ -1,0 +1,10 @@
+# Plugins cài sẵn khi build image Jenkins.
+# Nếu plugin nào lỗi phiên bản, có thể bỏ dòng đó và cài tay trong UI.
+workflow-aggregator
+git
+github-branch-source
+credentials-binding
+docker-workflow
+junit
+timestamper
+ssh-agent

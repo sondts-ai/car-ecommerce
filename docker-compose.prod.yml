@@ -1,0 +1,88 @@
+# Overlay cho môi trường cloud/production:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build
+#
+# Image được build & push bởi Jenkins với tag ${IMAGE_TAG}; compose chỉ pull,
+# không build trên server. Mọi biến nhạy cảm lấy từ .env (Jenkins ghi ra server)
+# hoặc từ secret manager của cloud.
+services:
+  mysql:
+    pull_policy: always
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  auth-service:
+    pull_policy: always
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  customer-service:
+    pull_policy: always
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  order-service:
+    pull_policy: always
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  car-service:
+    pull_policy: always
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  inventory-service:
+    pull_policy: always
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  payment-service:
+    pull_policy: always
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  api-gateway:
+    pull_policy: always
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    pull_policy: always
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

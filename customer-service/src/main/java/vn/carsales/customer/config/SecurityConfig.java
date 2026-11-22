@@ -27,7 +27,7 @@ public class SecurityConfig {
               res.setStatus(HttpStatus.FORBIDDEN.value());res.setCharacterEncoding(StandardCharsets.UTF_8.name());res.setContentType(MediaType.APPLICATION_JSON_VALUE);
               mapper.writeValue(res.getOutputStream(),new ApiResponse<>(false,"Customer role is required",null));
           }))
-          .authorizeHttpRequests(a->a.anyRequest().hasRole("CUSTOMER"))
+          .authorizeHttpRequests(a->a.requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll().anyRequest().hasRole("CUSTOMER"))
           .addFilterBefore(new JwtAuthenticationFilter(jwt),UsernamePasswordAuthenticationFilter.class).build();
     }
     @Bean CorsConfigurationSource corsConfigurationSource(@Value("${app.cors.allowed-origins}")String origins){

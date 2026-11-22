@@ -19,4 +19,7 @@ public class OrderItem {
     private BigDecimal price;
     public Long getId(){return id;} public Long getOrderId(){return orderId;} public Long getVehicleId(){return vehicleId;}
     public String getVehicleName(){return vehicleName;} public String getVin(){return vin;} public BigDecimal getPrice(){return price;}
+    public void setOrderId(Long value){orderId=value;} public void setVehicleId(Long value){vehicleId=value;}
+    public void setVehicleName(String value){vehicleName=value;} public void setVin(String value){vin=value;}
+    public void setPrice(BigDecimal value){price=value;}
 }

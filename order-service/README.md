@@ -8,24 +8,31 @@ Every route requires `Authorization: Bearer <Auth JWT>` with role `CUSTOMER`.
 
 | Method | URL | Behavior |
 |---|---|---|
+| POST | `/api/v1/me/orders` | Creates a `PENDING_DEPOSIT` order + item snapshot; rejects deposit > total |
 | GET | `/api/v1/me/cart` | Resolves customer, returns active cart; creates an empty active cart if missing |
 | DELETE | `/api/v1/me/cart/items/{vehicleId}` | Removes that vehicle ID from the caller's active cart |
 | DELETE | `/api/v1/me/cart/items` | Removes all items from the caller's active cart |
 | GET | `/api/v1/me/orders` | Lists only orders whose `customer_id` matches Customer Service identity |
 | GET | `/api/v1/me/orders/{orderId}` | Reads an owned order and its item snapshots |
 | GET | `/api/v1/me/orders/{orderId}/history` | Reads status history after verifying order ownership |
+| POST | `/api/v1/me/internal/orders/{orderId}/deposit-paid` | Internal only (`X-Internal-Key`, not routed by Nginx); Payment Service calls it after a successful payment |
 
 All order reads filter by both `order_id` and verified `customer_id`; a foreign or nonexistent order returns 404. Customer IDs come from Customer Service REST and are never accepted from the request body. Auth or Customer Service outages return 503/502 rather than falling back to a client-supplied ID.
 
 ## Explicit dependencies / deferred operations
 
-The inspected project contains no vehicle API or module. Therefore this service does not add cart items and does not create deposit orders or reservations yet. Those writes require a vehicle source to validate availability and provide the `vehicle_name`, VIN, and price snapshots required by `order_items`. No API contract is guessed and `vehicle_db` is never accessed.
+`POST /me/orders` currently trusts the item snapshot sent by the caller (`vehicleId`, `vehicleName`, `vin`, `price`). There is no Vehicle/Inventory REST client yet, so availability is **not** validated and no row is inserted into `vehicle_reservations`; `reserved_until` is stored on the order only as an informational value.
 
-The schema has no quantity column in `cart_items`; cart item quantity is not supported. `vehicle_reservations` requires an expiry value but no hold duration/configuration is specified, so no reservation is created and no expiration duration is invented. There are no order-state update APIs. This customer-facing service exposes reads only and cannot mark an order paid. No payment integration is present.
+Not implemented:
+
+- Adding items to the cart (only read/remove/clear exist); `cart_items` has no quantity column.
+- Vehicle availability check / hold / reservation expiry job (`vehicle_reservations` table is unused).
+- Order cancellation and automatic expiry of unpaid deposits.
+- Order ownership check on Payment Service: it calls `deposit-paid` with the internal key, but Payment Service itself has no JWT authentication yet.
 
 ## Database
 
-Applies the existing `database/order_db/schema.sql` from `car-ecommerce-main.zip` manually before startup. Hibernate is `ddl-auto: validate`; this service does not create or alter schema. It maps carts, cart items, orders, order items and status history. Reservation writes remain deferred with vehicle validation/hold policy.
+Applies the existing `database/order_db/schema.sql` from `car-ecommerce-main.zip` manually before startup. Hibernate is `ddl-auto: validate`; this service does not create or alter schema. It maps carts, cart items, orders, order items and status history. Reservation writes remain deferred until an inventory API and hold policy are agreed.
 
 ## Run
 
@@ -46,4 +53,4 @@ Default port is `8083`. Run unit tests with `mvn test`. The Postman collection a
 3. `GET /api/v1/me/cart` returns an empty or existing cart. `DELETE` item returns 404 if that ID is absent; clear returns the number removed.
 4. Order list/detail/history return persisted data only. Detail/history for an order owned by another customer returns 404.
 5. Requests without a token or with an invalid/expired token return 401. A non-CUSTOMER token is rejected.
-6. Cart add, deposit order creation and reservation race checks cannot be exercised until a vehicle data REST API and hold-duration policy are supplied.
+6. `POST /api/v1/me/orders` creates a deposit order from the supplied snapshot. Reservation race checks cannot be exercised until a vehicle/inventory API and hold-duration policy are supplied.

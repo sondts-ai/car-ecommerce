@@ -22,4 +22,7 @@ public class OrderStatusHistory {
     public Long getId(){return id;} public Long getOrderId(){return orderId;} public OrderStatus getOldStatus(){return oldStatus;}
     public OrderStatus getNewStatus(){return newStatus;} public String getNote(){return note;} public Long getChangedBy(){return changedBy;}
     public LocalDateTime getCreatedAt(){return createdAt;}
+    public void setOrderId(Long value){orderId=value;} public void setOldStatus(OrderStatus value){oldStatus=value;}
+    public void setNewStatus(OrderStatus value){newStatus=value;} public void setNote(String value){note=value;}
+    public void setChangedBy(Long value){changedBy=value;}
 }

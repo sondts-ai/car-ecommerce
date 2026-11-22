@@ -1,0 +1,247 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: auth_db
+    # Mặc định chỉ mở cổng trên loopback; đặt MYSQL_BIND=0.0.0.0 nếu thật sự cần.
+    ports:
+      - "${MYSQL_BIND:-127.0.0.1}:${MYSQL_PORT:-3307}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database:/docker-entrypoint-initdb.d/database:ro
+      - ./docker/mysql/init/00-create-app-user.sql:/docker-entrypoint-initdb.d/00-create-app-user.sql:ro
+      - ./docker/mysql/init/01-init-databases.sql:/docker-entrypoint-initdb.d/01-init-databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    networks:
+      - car-network
+
+  auth-service:
+    image: ${IMAGE_PREFIX:-car-ecommerce}/auth-service:${IMAGE_TAG:-local}
+    build:
+      context: ./auth-service
+    environment:
+      AUTH_SERVER_PORT: 8081
+      AUTH_DB_URL: jdbc:mysql://mysql:3306/auth_db?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Ho_Chi_Minh
+      AUTH_DB_USERNAME: ${DB_USERNAME:-car_app}
+      AUTH_DB_PASSWORD: ${DB_PASSWORD:-CarApp@123}
+      JWT_SECRET: ${JWT_SECRET:-local-dev-only-secret-change-me-32bytes!}
+      JWT_ISSUER: ${JWT_ISSUER:-car-sales-auth}
+      CUSTOMER_SERVICE_URL: http://customer-service:8082
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8081/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - car-network
+
+  customer-service:
+    image: ${IMAGE_PREFIX:-car-ecommerce}/customer-service:${IMAGE_TAG:-local}
+    build:
+      context: ./customer-service
+    environment:
+      CUSTOMER_SERVER_PORT: 8082
+      CUSTOMER_DB_URL: jdbc:mysql://mysql:3306/customer_db?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Ho_Chi_Minh
+      CUSTOMER_DB_USERNAME: ${DB_USERNAME:-car_app}
+      CUSTOMER_DB_PASSWORD: ${DB_PASSWORD:-CarApp@123}
+      JWT_SECRET: ${JWT_SECRET:-local-dev-only-secret-change-me-32bytes!}
+      JWT_ISSUER: ${JWT_ISSUER:-car-sales-auth}
+      AUTH_SERVICE_URL: http://auth-service:8081
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8082/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - car-network
+
+  order-service:
+    image: ${IMAGE_PREFIX:-car-ecommerce}/order-service:${IMAGE_TAG:-local}
+    build:
+      context: ./order-service
+    environment:
+      ORDER_SERVER_PORT: 8083
+      ORDER_DB_URL: jdbc:mysql://mysql:3306/order_db?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Ho_Chi_Minh
+      ORDER_DB_USERNAME: ${DB_USERNAME:-car_app}
+      ORDER_DB_PASSWORD: ${DB_PASSWORD:-CarApp@123}
+      JWT_SECRET: ${JWT_SECRET:-local-dev-only-secret-change-me-32bytes!}
+      JWT_ISSUER: ${JWT_ISSUER:-car-sales-auth}
+      CUSTOMER_SERVICE_URL: http://customer-service:8082
+      ORDER_INTERNAL_KEY: ${ORDER_INTERNAL_KEY:-local-internal-key}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      customer-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8083/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - car-network
+
+  car-service:
+    image: ${IMAGE_PREFIX:-car-ecommerce}/car-service:${IMAGE_TAG:-local}
+    build:
+      context: ./car-service
+    environment:
+      SERVER_PORT: 8084
+      DB_URL: jdbc:mysql://mysql:3306/vehicle_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh&characterEncoding=utf8
+      DB_USERNAME: ${DB_USERNAME:-car_app}
+      DB_PASSWORD: ${DB_PASSWORD:-CarApp@123}
+      JWT_SECRET: ${JWT_SECRET:-local-dev-only-secret-change-me-32bytes!}
+      JWT_ISSUER: ${JWT_ISSUER:-car-sales-auth}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8084/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - car-network
+
+  inventory-service:
+    image: ${IMAGE_PREFIX:-car-ecommerce}/inventory-service:${IMAGE_TAG:-local}
+    build:
+      context: ./inventory-service
+    environment:
+      SERVER_PORT: 8085
+      DB_URL: jdbc:mysql://mysql:3306/vehicle_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh&characterEncoding=utf8
+      DB_USERNAME: ${DB_USERNAME:-car_app}
+      DB_PASSWORD: ${DB_PASSWORD:-CarApp@123}
+      JWT_SECRET: ${JWT_SECRET:-local-dev-only-secret-change-me-32bytes!}
+      JWT_ISSUER: ${JWT_ISSUER:-car-sales-auth}
+      CAR_SERVICE_URL: http://car-service:8084
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      car-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8085/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - car-network
+
+  payment-service:
+    image: ${IMAGE_PREFIX:-car-ecommerce}/payment-service:${IMAGE_TAG:-local}
+    build:
+      context: ./payment-service
+    environment:
+      PAYMENT_SERVER_PORT: 8086
+      PAYMENT_DB_URL: jdbc:mysql://mysql:3306/payment_db?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Ho_Chi_Minh
+      PAYMENT_DB_USERNAME: ${DB_USERNAME:-car_app}
+      PAYMENT_DB_PASSWORD: ${DB_PASSWORD:-CarApp@123}
+      ORDER_SERVICE_URL: http://order-service:8083
+      ORDER_INTERNAL_KEY: ${ORDER_INTERNAL_KEY:-local-internal-key}
+      CUSTOMER_SERVICE_URL: http://customer-service:8082
+      JWT_SECRET: ${JWT_SECRET:-local-dev-only-secret-change-me-32bytes!}
+      JWT_ISSUER: ${JWT_ISSUER:-car-sales-auth}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8086/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - car-network
+
+  api-gateway:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      customer-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      car-service:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+      payment-service:
+        condition: service_healthy
+    ports:
+      - "${GATEWAY_PORT:-8080}:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - car-network
+
+  frontend:
+    image: ${IMAGE_PREFIX:-car-ecommerce}/frontend:${IMAGE_TAG:-local}
+    build:
+      context: .
+      # NEXT_PUBLIC_* là build-time: Jenkins/CI phải truyền đúng URL public tại đây.
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/api}
+        NEXT_PUBLIC_API_TIMEOUT: ${NEXT_PUBLIC_API_TIMEOUT:-15000}
+        NEXT_PUBLIC_USE_MOCK_API: ${NEXT_PUBLIC_USE_MOCK_API:-true}
+        NEXT_PUBLIC_USE_BACKEND_SERVICES: ${NEXT_PUBLIC_USE_BACKEND_SERVICES:-true}
+        NEXT_PUBLIC_AUTH_API_URL: ${NEXT_PUBLIC_AUTH_API_URL:-http://localhost:8080/api/v1}
+        NEXT_PUBLIC_CUSTOMER_API_URL: ${NEXT_PUBLIC_CUSTOMER_API_URL:-http://localhost:8080/api/v1}
+        NEXT_PUBLIC_ORDER_API_URL: ${NEXT_PUBLIC_ORDER_API_URL:-http://localhost:8080/api/v1}
+        NEXT_PUBLIC_PAYMENT_API_URL: ${NEXT_PUBLIC_PAYMENT_API_URL:-http://localhost:8080/api/v1}
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    restart: unless-stopped
+    networks:
+      - car-network
+
+volumes:
+  mysql_data:
+
+networks:
+  car-network:
+    driver: bridge

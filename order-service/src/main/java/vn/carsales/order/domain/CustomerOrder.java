@@ -36,4 +36,9 @@ public class CustomerOrder {
     public BigDecimal getSubtotal(){return subtotal;} public BigDecimal getTotalAmount(){return totalAmount;} public BigDecimal getDepositAmount(){return depositAmount;}
     public BigDecimal getRemainingAmount(){return remainingAmount;} public OrderStatus getStatus(){return status;} public LocalDateTime getReservedUntil(){return reservedUntil;}
     public String getNote(){return note;} public LocalDateTime getCreatedAt(){return createdAt;} public LocalDateTime getUpdatedAt(){return updatedAt;}
+    public void setOrderCode(String value){orderCode=value;} public void setCustomerId(Long value){customerId=value;}
+    public void setSubtotal(BigDecimal value){subtotal=value;} public void setTotalAmount(BigDecimal value){totalAmount=value;}
+    public void setDepositAmount(BigDecimal value){depositAmount=value;} public void setRemainingAmount(BigDecimal value){remainingAmount=value;}
+    public void setStatus(OrderStatus value){status=value;} public void setReservedUntil(LocalDateTime value){reservedUntil=value;}
+    public void setNote(String value){note=value;}
 }

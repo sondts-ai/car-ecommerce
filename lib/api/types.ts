@@ -68,6 +68,7 @@ export type RegisterPayload = {
   email: string;
   phone: string;
   password: string;
+  confirmPassword: string;
 };
 
 export type ForgotPasswordResult = {
@@ -132,8 +133,12 @@ export type PaymentMethodId = "vnpay" | "visa" | "transfer" | "showroom";
 
 export type CreateDepositPayload = {
   carSlug: string;
+  vehicleId?: number;
+  carName?: string;
+  vin?: string;
   showroomId: string;
   amount: number;
+  totalAmount?: number;
   note?: string;
   customer: {
     fullName: string;
@@ -175,6 +180,9 @@ export type PaymentDto = {
 export type CreatePaymentIntentPayload = {
   depositId: string;
   method: PaymentMethodId;
+  /** ID thật của order_db.orders; có thì gọi Payment Service, không có thì dùng mock. */
+  orderId?: number;
+  amount?: number;
 };
 
 /* ------------------------------ Test drives ------------------------------ */
@@ -225,6 +233,7 @@ export type TestDriveSlotsDto = {
 
 export type CustomerProfile = AuthUser & {
   birthday?: string;
+  gender?: "MALE" | "FEMALE" | "OTHER";
   address?: string;
   city?: string;
   newsletter: boolean;
@@ -234,3 +243,31 @@ export type CustomerProfile = AuthUser & {
 export type UpdateProfilePayload = Partial<
   Pick<CustomerProfile, "fullName" | "phone" | "birthday" | "address" | "city" | "newsletter">
 >;
+
+export type OrderDto = {
+  id: number;
+  orderCode: string;
+  subtotal: number;
+  totalAmount: number;
+  depositAmount: number;
+  remainingAmount: number;
+  status:
+    | "PENDING_DEPOSIT"
+    | "DEPOSIT_PAID"
+    | "CONFIRMED"
+    | "WAITING_REMAINING_PAYMENT"
+    | "COMPLETED"
+    | "CANCELLED"
+    | "EXPIRED"
+    | "REFUNDED";
+  reservedUntil?: string;
+  note?: string;
+  createdAt: string;
+  updatedAt: string;
+  items: Array<{
+    vehicleId: number;
+    vehicleName: string;
+    vin: string;
+    price: number;
+  }>;
+};
