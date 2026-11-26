@@ -229,6 +229,8 @@ services:
         NEXT_PUBLIC_AUTH_API_URL: ${NEXT_PUBLIC_AUTH_API_URL:-http://localhost:8080/api/v1}
         NEXT_PUBLIC_CUSTOMER_API_URL: ${NEXT_PUBLIC_CUSTOMER_API_URL:-http://localhost:8080/api/v1}
         NEXT_PUBLIC_ORDER_API_URL: ${NEXT_PUBLIC_ORDER_API_URL:-http://localhost:8080/api/v1}
+        NEXT_PUBLIC_ADMIN_CAR_API_URL: ${NEXT_PUBLIC_ADMIN_CAR_API_URL:-http://localhost:8080/api/v1}
+        NEXT_PUBLIC_ADMIN_INVENTORY_API_URL: ${NEXT_PUBLIC_ADMIN_INVENTORY_API_URL:-http://localhost:8080/api/v1}
         NEXT_PUBLIC_PAYMENT_API_URL: ${NEXT_PUBLIC_PAYMENT_API_URL:-http://localhost:8080/api/v1}
     depends_on:
       api-gateway:

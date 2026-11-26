@@ -50,6 +50,7 @@ export type AuthUser = {
   fullName: string;
   email: string;
   phone: string;
+  role?: "ADMIN" | "STAFF" | "CUSTOMER" | string;
   tier: CustomerTier;
   joinedAt: string;
 };

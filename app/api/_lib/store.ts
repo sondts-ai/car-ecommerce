@@ -158,8 +158,40 @@ function createStore(): MockStore {
     },
   ];
 
+  demoUser.role = "CUSTOMER";
+
+  const adminUser: StoredUser = {
+    id: "usr_admin",
+    fullName: "Quản trị viên AutoWeb",
+    email: "admin@carsales.vn",
+    phone: "0900000001",
+    role: "ADMIN",
+    tier: "Kim Cương",
+    joinedAt: isoDaysFromNow(-500),
+    address: "Số 1 Phạm Hùng, Nam Từ Liêm",
+    city: "Hà Nội",
+    newsletter: false,
+    updatedAt: nowIso(),
+    passwordHash: hashPassword("Admin@123"),
+  };
+
+  const customerSeedUser: StoredUser = {
+    id: "usr_customer_seed",
+    fullName: "Khách hàng AutoWeb",
+    email: "customer@carsales.vn",
+    phone: "0900000002",
+    role: "CUSTOMER",
+    tier: "Bạc",
+    joinedAt: isoDaysFromNow(-120),
+    address: "Số 2 Nguyễn Văn Linh, Quận 7",
+    city: "TP. Hồ Chí Minh",
+    newsletter: true,
+    updatedAt: nowIso(),
+    passwordHash: hashPassword("Admin@123"),
+  };
+
   return {
-    users: [demoUser],
+    users: [demoUser, adminUser, customerSeedUser],
     sessions: new Map(),
     otps: new Map(),
     deposits: [...deposits],

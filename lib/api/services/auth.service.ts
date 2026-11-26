@@ -3,6 +3,7 @@ import { ApiError, http } from "../http";
 import { clearTokens, setTokens } from "../token";
 import type {
   AuthSession,
+  AuthUser,
   ChangePasswordPayload,
   ForgotPasswordResult,
   LoginPayload,
@@ -15,16 +16,18 @@ export type ResetPasswordPayload = {
   newPassword: string;
 };
 
+type BackendUserView = {
+  id: number;
+  email: string;
+  phone: string;
+  role: string;
+  status: string;
+};
+
 type BackendAuthView = {
   token: string;
   tokenType: string;
-  user: {
-    id: number;
-    email: string;
-    phone: string;
-    role: string;
-    status: string;
-  };
+  user: BackendUserView;
 };
 
 type BackendRegistrationView = {
@@ -42,19 +45,24 @@ function backendOnlyMessage(): never {
   });
 }
 
+function mapBackendUser(user: BackendUserView): AuthUser {
+  return {
+    id: String(user.id),
+    fullName: user.email,
+    email: user.email,
+    phone: user.phone,
+    role: user.role,
+    tier: "Bạc",
+    joinedAt: "",
+  };
+}
+
 function mapBackendAuth(data: BackendAuthView): AuthSession {
   return {
     accessToken: data.token,
     refreshToken: "",
     expiresIn: 0,
-    user: {
-      id: String(data.user.id),
-      fullName: data.user.email,
-      email: data.user.email,
-      phone: data.user.phone,
-      tier: "Bạc",
-      joinedAt: "",
-    },
+    user: mapBackendUser(data.user),
   };
 }
 
@@ -73,6 +81,18 @@ export const authApi = {
     }
     const { data } = await http.post<AuthSession>(ENDPOINTS.auth.login, payload, { skipAuth: true });
     setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
+    return data;
+  },
+
+  /** GET /auth/me — lấy thông tin tài khoản & role hiện tại */
+  async me(): Promise<AuthUser> {
+    if (API_CONFIG.useBackendServices) {
+      const { data } = await http.get<BackendUserView>("/auth/me", {
+        baseUrl: API_CONFIG.services.auth,
+      });
+      return mapBackendUser(data);
+    }
+    const { data } = await http.get<AuthUser>("/auth/me");
     return data;
   },
 
@@ -96,10 +116,13 @@ export const authApi = {
 
   /** POST /auth/logout — luôn xoá token cục bộ kể cả khi API lỗi */
   async logout(): Promise<void> {
-    if (!API_CONFIG.useBackendServices) {
-      await http.post<{ ok: true }>(ENDPOINTS.auth.logout);
+    try {
+      if (!API_CONFIG.useBackendServices) {
+        await http.post<{ ok: true }>(ENDPOINTS.auth.logout);
+      }
+    } finally {
+      clearTokens();
     }
-    clearTokens();
   },
 
   /** POST /auth/forgot-password */

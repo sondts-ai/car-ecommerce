@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const COLUMNS = [
   {
@@ -24,6 +25,9 @@ const COLUMNS = [
 ];
 
 export function SiteFooter() {
+  const pathname = usePathname();
+  if (pathname.startsWith("/admin")) return null;
+
   return (
     <footer className="mt-24 bg-ink-950 text-cream-100/70">
       <div className="container-luxe grid gap-12 py-16 md:grid-cols-2 lg:grid-cols-4">

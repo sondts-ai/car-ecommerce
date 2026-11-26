@@ -17,6 +17,13 @@ export const API_CONFIG = {
       "",
     ),
     order: (process.env.NEXT_PUBLIC_ORDER_API_URL || "http://localhost:8083/api/v1").replace(/\/+$/, ""),
+    adminCar: (process.env.NEXT_PUBLIC_ADMIN_CAR_API_URL || "http://localhost:8084/api/v1").replace(
+      /\/+$/,
+      "",
+    ),
+    adminInventory: (
+      process.env.NEXT_PUBLIC_ADMIN_INVENTORY_API_URL || "http://localhost:8085/api/v1"
+    ).replace(/\/+$/, ""),
     payment: (process.env.NEXT_PUBLIC_PAYMENT_API_URL || "http://localhost:8086/api/v1").replace(
       /\/+$/,
       "",
