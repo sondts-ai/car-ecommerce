@@ -25,14 +25,14 @@ public class SecurityConfig{
               mapper.writeValue(res.getOutputStream(),new ApiResponse<>(false,"Authentication required or JWT is invalid",null));
           }).accessDeniedHandler((req,res,ex)->{
               res.setStatus(HttpStatus.FORBIDDEN.value());res.setCharacterEncoding(StandardCharsets.UTF_8.name());res.setContentType(MediaType.APPLICATION_JSON_VALUE);
-              mapper.writeValue(res.getOutputStream(),new ApiResponse<>(false,"Customer role is required",null));
+              mapper.writeValue(res.getOutputStream(),new ApiResponse<>(false,"Insufficient role for this resource",null));
           }))
-          .authorizeHttpRequests(a->a.requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll().requestMatchers("/api/v1/me/internal/**").permitAll().anyRequest().hasRole("CUSTOMER"))
+          .authorizeHttpRequests(a->a.requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll().requestMatchers("/api/v1/me/internal/**").permitAll().requestMatchers("/api/v1/admin/**").hasRole("ADMIN").anyRequest().hasRole("CUSTOMER"))
           .addFilterBefore(new JwtAuthenticationFilter(jwt),UsernamePasswordAuthenticationFilter.class).build();
     }
     @Bean CorsConfigurationSource corsConfigurationSource(@Value("${app.cors.allowed-origins}")String origins){
         CorsConfiguration c=new CorsConfiguration();c.setAllowedOrigins(Arrays.stream(origins.split(",")).map(String::trim).toList());
-        c.setAllowedMethods(java.util.List.of("GET","DELETE","OPTIONS"));c.setAllowedHeaders(java.util.List.of("Authorization","Content-Type"));
+        c.setAllowedMethods(java.util.List.of("GET","POST","PUT","DELETE","OPTIONS"));c.setAllowedHeaders(java.util.List.of("Authorization","Content-Type"));
         UrlBasedCorsConfigurationSource source=new UrlBasedCorsConfigurationSource();source.registerCorsConfiguration("/**",c);return source;
     }
 }

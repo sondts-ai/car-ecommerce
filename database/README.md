@@ -11,7 +11,8 @@ database/
 │   └── seed.sql
 ├── customer_db/
 │   ├── schema.sql
-│   └── seed.sql
+│   ├── seed.sql
+│   └── 001_test_drives.sql
 ├── vehicle_db/
 │   ├── schema.sql
 │   └── seed.sql
@@ -47,6 +48,12 @@ mysql -h127.0.0.1 -P3306 -ucar_app -p < database/order_db/seed.sql
 
 mysql -h127.0.0.1 -P3306 -ucar_app -p < database/payment_db/schema.sql
 mysql -h127.0.0.1 -P3306 -ucar_app -p < database/payment_db/seed.sql
+```
+
+Nếu `customer_db` đã được tạo từ trước, chạy thêm migration tạo bảng lịch lái thử:
+
+```bash
+mysql -h127.0.0.1 -P3306 -ucar_app -p < database/customer_db/001_test_drives.sql
 ```
 
 Trong DBeaver: mở từng file `schema.sql` → **Execute script** (Alt+X), sau đó mở `seed.sql` → **Execute script**.
@@ -93,6 +100,7 @@ FLUSH PRIVILEGES;
 |---|---|
 | `customers` | `id`, `user_id` (UNIQUE, tham chiếu logic `auth_db.users.id`), `full_name`, `birthday`, `gender`, timestamps |
 | `customer_addresses` | `id`, `customer_id` (FK), `receiver_name`, `phone`, `address`, `is_default` |
+| `test_drives` | Lịch lái thử, khách, xe, showroom, thời gian và trạng thái; dữ liệu sở hữu bởi Customer Service |
 
 - Ràng buộc mỗi khách chỉ có **1 địa chỉ mặc định** bằng generated column + UNIQUE.
 - `customers.user_id` là tham chiếu logic xuyên service (không tạo FK vật lý).

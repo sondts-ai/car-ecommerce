@@ -11,6 +11,8 @@ const ADMIN_NAV = [
   { href: "/admin/categories", label: "Phân loại xe", exact: false },
   { href: "/admin/car-models", label: "Dòng xe & Phiên bản", exact: false },
   { href: "/admin/vehicles", label: "Kho xe cụ thể", exact: false },
+  { href: "/admin/orders", label: "Đơn đặt cọc", exact: false },
+  { href: "/admin/test-drives", label: "Lịch lái thử", exact: false },
   { href: "/admin/branches", label: "Chi nhánh showroom", exact: false },
 ];
 

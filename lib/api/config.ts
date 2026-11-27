@@ -11,20 +11,20 @@ export const API_CONFIG = {
   useMockApi: (process.env.NEXT_PUBLIC_USE_MOCK_API ?? "true") !== "false",
   useBackendServices: (process.env.NEXT_PUBLIC_USE_BACKEND_SERVICES ?? "true") !== "false",
   services: {
-    auth: (process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:8081/api/v1").replace(/\/+$/, ""),
-    customer: (process.env.NEXT_PUBLIC_CUSTOMER_API_URL || "http://localhost:8082/api/v1").replace(
+    auth: (process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:8080/api/v1").replace(/\/+$/, ""),
+    customer: (process.env.NEXT_PUBLIC_CUSTOMER_API_URL || "http://localhost:8080/api/v1").replace(
       /\/+$/,
       "",
     ),
-    order: (process.env.NEXT_PUBLIC_ORDER_API_URL || "http://localhost:8083/api/v1").replace(/\/+$/, ""),
-    adminCar: (process.env.NEXT_PUBLIC_ADMIN_CAR_API_URL || "http://localhost:8084/api/v1").replace(
+    order: (process.env.NEXT_PUBLIC_ORDER_API_URL || "http://localhost:8080/api/v1").replace(/\/+$/, ""),
+    adminCar: (process.env.NEXT_PUBLIC_ADMIN_CAR_API_URL || "http://localhost:8080/api/v1").replace(
       /\/+$/,
       "",
     ),
     adminInventory: (
-      process.env.NEXT_PUBLIC_ADMIN_INVENTORY_API_URL || "http://localhost:8085/api/v1"
+      process.env.NEXT_PUBLIC_ADMIN_INVENTORY_API_URL || "http://localhost:8080/api/v1"
     ).replace(/\/+$/, ""),
-    payment: (process.env.NEXT_PUBLIC_PAYMENT_API_URL || "http://localhost:8086/api/v1").replace(
+    payment: (process.env.NEXT_PUBLIC_PAYMENT_API_URL || "http://localhost:8080/api/v1").replace(
       /\/+$/,
       "",
     ),

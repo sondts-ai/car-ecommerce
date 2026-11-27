@@ -209,6 +209,59 @@ export type VehicleStats = {
   byCondition: Record<string, number>;
 };
 
+/* --------------------------- Order / Revenue ----------------------------- */
+
+export type MonthlyRevenue = {
+  /** Dạng YYYY-MM, ví dụ "2026-11" */
+  month: string;
+  revenue: number;
+  orders: number;
+};
+
+export type AdminOrderStats = {
+  totalOrders: number;
+  pendingDeposit: number;
+  depositPaid: number;
+  confirmed: number;
+  completed: number;
+  cancelled: number;
+  totalRevenue: number;
+  totalDepositRevenue: number;
+  monthlyRevenue: MonthlyRevenue[];
+};
+
+export type AdminOrderStatus =
+  | "PENDING_DEPOSIT"
+  | "DEPOSIT_PAID"
+  | "CONFIRMED"
+  | "WAITING_REMAINING_PAYMENT"
+  | "COMPLETED"
+  | "CANCELLED"
+  | "EXPIRED"
+  | "REFUNDED";
+
+export type AdminOrder = {
+  id: number | string;
+  orderCode: string;
+  customerId?: number;
+  customer?: { fullName: string; phone: string; email?: string };
+  subtotal: number;
+  totalAmount: number;
+  depositAmount: number;
+  remainingAmount: number;
+  status: AdminOrderStatus;
+  reservedUntil?: string | null;
+  note?: string | null;
+  createdAt: string;
+  updatedAt?: string;
+  items: Array<{
+    vehicleId: number;
+    vehicleName: string;
+    vin: string;
+    price: number;
+  }>;
+};
+
 /* ----------------------------- Query Types ------------------------------- */
 
 export type AdminListParams = {

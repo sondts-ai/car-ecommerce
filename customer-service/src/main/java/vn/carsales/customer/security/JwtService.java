@@ -19,7 +19,7 @@ public class JwtService {
         Object rawId=c.get("userId");
         if(!(rawId instanceof Number id)||id.longValue()<=0) throw new IllegalArgumentException("JWT userId claim is missing");
         String role=c.get("role",String.class);
-        if(!"CUSTOMER".equals(role)) throw new IllegalArgumentException("CUSTOMER role is required");
+        if(!"CUSTOMER".equals(role)&&!"ADMIN".equals(role)) throw new IllegalArgumentException("Unsupported JWT role");
         if(c.getSubject()==null||c.getSubject().isBlank()) throw new IllegalArgumentException("JWT subject is missing");
         return new CustomerPrincipal(id.longValue(),c.getSubject(),role);
     }

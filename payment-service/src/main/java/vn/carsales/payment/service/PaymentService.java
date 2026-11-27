@@ -42,10 +42,26 @@ public class PaymentService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Payment amount must equal the order deposit amount");
         }
-        if (payments.findFirstByOrderIdAndPaymentTypeOrderByCreatedAtDesc(
-                request.orderId(), PaymentType.DEPOSIT).isPresent()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "A deposit payment already exists for this order");
+        var existingPayment = payments.findFirstByOrderIdAndPaymentTypeOrderByCreatedAtDesc(
+                request.orderId(), PaymentType.DEPOSIT);
+        if (existingPayment.isPresent()) {
+            Payment payment = existingPayment.get();
+            if (payment.getAmount().compareTo(request.amount()) != 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Payment amount must equal the existing deposit payment amount");
+            }
+            if (payment.getStatus() != PaymentStatus.PENDING && payment.getStatus() != PaymentStatus.PAID) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "The existing deposit payment is no longer payable");
+            }
+            TransactionStatus transactionStatus = payment.getStatus() == PaymentStatus.PAID
+                    ? TransactionStatus.SUCCESS : TransactionStatus.PENDING;
+            PaymentTransaction transaction = transactions
+                    .findFirstByPaymentIdAndTransactionStatusOrderByCreatedAtDesc(
+                            payment.getId(), transactionStatus)
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.CONFLICT, "The existing payment transaction is missing"));
+            return view(payment, transaction);
         }
         Payment payment = new Payment();
         payment.setOrderId(request.orderId());

@@ -4,7 +4,8 @@ Independent Spring Boot service backed only by `order_db`. It validates the Auth
 
 ## Implemented APIs
 
-Every route requires `Authorization: Bearer <Auth JWT>` with role `CUSTOMER`.
+Customer routes require `Authorization: Bearer <Auth JWT>` with role `CUSTOMER`.
+Admin routes require the same JWT with role `ADMIN`.
 
 | Method | URL | Behavior |
 |---|---|---|
@@ -16,8 +17,11 @@ Every route requires `Authorization: Bearer <Auth JWT>` with role `CUSTOMER`.
 | GET | `/api/v1/me/orders/{orderId}` | Reads an owned order and its item snapshots |
 | GET | `/api/v1/me/orders/{orderId}/history` | Reads status history after verifying order ownership |
 | POST | `/api/v1/me/internal/orders/{orderId}/deposit-paid` | Internal only (`X-Internal-Key`, not routed by Nginx); Payment Service calls it after a successful payment |
+| GET | `/api/v1/admin/orders` | Lists all orders and item snapshots for Admin |
+| PUT | `/api/v1/admin/orders/{orderId}/status` | Confirms an order after deposit payment or cancels an unpaid order; records status history |
+| GET | `/api/v1/admin/orders/stats` | Returns order/revenue totals for the Admin dashboard |
 
-All order reads filter by both `order_id` and verified `customer_id`; a foreign or nonexistent order returns 404. Customer IDs come from Customer Service REST and are never accepted from the request body. Auth or Customer Service outages return 503/502 rather than falling back to a client-supplied ID.
+Customer order reads filter by both `order_id` and verified `customer_id`; a foreign or nonexistent order returns 404. Customer IDs come from Customer Service REST and are never accepted from the request body. The Admin list is intentionally global and restricted to the ADMIN role. Auth or Customer Service outages return 503/502 rather than falling back to a client-supplied ID.
 
 ## Explicit dependencies / deferred operations
 
@@ -27,7 +31,7 @@ Not implemented:
 
 - Adding items to the cart (only read/remove/clear exist); `cart_items` has no quantity column.
 - Vehicle availability check / hold / reservation expiry job (`vehicle_reservations` table is unused).
-- Order cancellation and automatic expiry of unpaid deposits.
+- Cancellation/refund of paid orders and automatic expiry of unpaid deposits.
 - Order ownership check on Payment Service: it calls `deposit-paid` with the internal key, but Payment Service itself has no JWT authentication yet.
 
 ## Database
@@ -52,5 +56,5 @@ Default port is `8083`. Run unit tests with `mvn test`. The Postman collection a
 2. Ensure the account has a profile in Customer Service; configure `customerBaseUrl` and obtain another customer's token for ownership checks.
 3. `GET /api/v1/me/cart` returns an empty or existing cart. `DELETE` item returns 404 if that ID is absent; clear returns the number removed.
 4. Order list/detail/history return persisted data only. Detail/history for an order owned by another customer returns 404.
-5. Requests without a token or with an invalid/expired token return 401. A non-CUSTOMER token is rejected.
+5. Requests without a token or with an invalid/expired token return 401. Customer routes reject non-CUSTOMER roles; Admin routes require ADMIN.
 6. `POST /api/v1/me/orders` creates a deposit order from the supplied snapshot. Reservation race checks cannot be exercised until a vehicle/inventory API and hold-duration policy are supplied.

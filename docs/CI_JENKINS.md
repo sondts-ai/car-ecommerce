@@ -28,7 +28,8 @@ cấu hình job và cách deploy lên EC2. Đọc từ trên xuống là làm đ
 
 - **Jenkins chỉ build/test/push**, không chạy app production.
 - **EC2 chỉ pull image và chạy compose** (`--no-build`).
-- Admin UI (nếu làm sau) chỉ là thêm 1 image; pipeline hiện tại không phụ thuộc.
+- Admin UI nằm trong chính app Next.js tại `/admin`, nên chỉ build 1 image
+  `frontend`; pipeline truyền `NEXT_PUBLIC_ADMIN_*_API_URL` trỏ về gateway.
 
 ---
 
@@ -138,11 +139,12 @@ Chỉ branch `main` mới push image và deploy.
 |---|---|---|
 | `IMAGE_PREFIX` | `your-dockerhub-user` | Docker Hub namespace. Image: `<prefix>/auth-service`... |
 | `PUBLIC_API_BASE_URL` | `http://localhost:8080/api/v1` | URL API **trình duyệt** gọi, được nướng vào frontend lúc build |
-| `USE_MOCK_API` | `false` | Bật mock API trong frontend |
+| `USE_MOCK_API` | `true` | Bật mock API trong frontend (catalog/lái thử/OTP vẫn dùng mock) |
 | `PUSH_IMAGES` | `true` | Push Docker Hub (chỉ `main`) |
 | `DEPLOY` | `false` | Deploy EC2 sau khi push |
 | `DEPLOY_USER` | `ubuntu` | SSH user EC2 |
 | `DEPLOY_HOST` | (trống) | IP/DNS EC2 |
+| `DEPLOY_PATH` | `/opt/car-ecommerce` | Thư mục repo trên EC2 |
 | `PUBLIC_URL` | (trống) | URL public để smoke test |
 
 **Lần chạy đầu nên để `PUSH_IMAGES=false`** để kiểm tra build/test, sau đó:
@@ -287,9 +289,8 @@ docker compose -f docker-compose.jenkins.yml up -d --build
 
 ## 14. Ghi chú phạm vi
 
-- Tài liệu này **chỉ** cho CI/CD. Admin UI chưa có — không ảnh hưởng pipeline.
-- Khi làm admin UI:
-  - Nếu nằm trong app Next.js hiện tại (`/admin`): không cần sửa Jenkinsfile.
-  - Nếu tách app riêng: thêm 1 service vào `docker-compose*.yml`, 1 dòng trong
-    `SERVICES`/`IMAGES` của `Jenkinsfile`, và 1 route Nginx.
+- Tài liệu này **chỉ** cho CI/CD. Admin UI nằm trong app Next.js (`/admin`)
+  nên không cần thêm service/image riêng.
+- Nếu tách admin thành app riêng sau này: thêm 1 service vào `docker-compose*.yml`,
+  1 dòng trong `SERVICES`/`IMAGES` của `Jenkinsfile`, và 1 route Nginx.
 - Nginx đã route các API `/api/v1/admin/*` cần bởi admin UI.

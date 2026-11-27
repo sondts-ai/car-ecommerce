@@ -31,6 +31,7 @@ type MockStore = {
   deposits: DepositDto[];
   payments: PaymentDto[];
   testDrives: TestDriveDto[];
+  testDriveOwners: Map<string, string>;
   reviews: ReviewDto[];
   sequences: Record<string, number>;
 };
@@ -197,6 +198,7 @@ function createStore(): MockStore {
     deposits: [...deposits],
     payments: [],
     testDrives: [...testDrives],
+    testDriveOwners: new Map([["td_seed_1", demoUser.id]]),
     reviews: seedReviews(),
     sequences: {},
   };

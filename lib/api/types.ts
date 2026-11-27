@@ -188,10 +188,11 @@ export type CreatePaymentIntentPayload = {
 
 /* ------------------------------ Test drives ------------------------------ */
 
-export type TestDriveStatus = "pending" | "confirmed" | "completed" | "cancelled";
+export type TestDriveStatus = "pending" | "confirmed" | "completed" | "cancelled" | "rejected";
 
 export type CreateTestDrivePayload = {
   carSlug: string;
+  carName?: string;
   showroomId: string;
   date: string; // YYYY-MM-DD
   time: string; // HH:mm

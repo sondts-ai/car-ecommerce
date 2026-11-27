@@ -3,6 +3,9 @@ package vn.carsales.customer.api;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.*;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import java.util.stream.Collectors;
@@ -13,6 +16,14 @@ public class ApiExceptionHandler {
     ResponseEntity<ApiResponse<String>> validation(MethodArgumentNotValidException ex){
         String details=ex.getBindingResult().getFieldErrors().stream().map(e->e.getField()+": "+e.getDefaultMessage()).collect(Collectors.joining("; "));
         return ResponseEntity.badRequest().body(new ApiResponse<>(false,"Invalid request",details));
+    }
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    ResponseEntity<ApiResponse<String>> unreadable(HttpMessageNotReadableException ex){
+        return ResponseEntity.badRequest().body(new ApiResponse<>(false,"Invalid request body","Request body contains an invalid value"));
+    }
+    @ExceptionHandler({MissingServletRequestParameterException.class, MethodArgumentTypeMismatchException.class})
+    ResponseEntity<ApiResponse<String>> invalidParameter(Exception ex){
+        return ResponseEntity.badRequest().body(new ApiResponse<>(false,"Invalid request parameter",ex.getMessage()));
     }
     @ExceptionHandler(ResponseStatusException.class)
     ResponseEntity<ApiResponse<Void>> status(ResponseStatusException ex){

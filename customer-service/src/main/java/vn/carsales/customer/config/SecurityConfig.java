@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
@@ -25,9 +26,16 @@ public class SecurityConfig {
               mapper.writeValue(res.getOutputStream(),new ApiResponse<>(false,"Authentication required or JWT is invalid",null));
           }).accessDeniedHandler((req,res,ex)->{
               res.setStatus(HttpStatus.FORBIDDEN.value());res.setCharacterEncoding(StandardCharsets.UTF_8.name());res.setContentType(MediaType.APPLICATION_JSON_VALUE);
-              mapper.writeValue(res.getOutputStream(),new ApiResponse<>(false,"Customer role is required",null));
+              mapper.writeValue(res.getOutputStream(),new ApiResponse<>(false,"Required role is missing",null));
           }))
-          .authorizeHttpRequests(a->a.requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll().anyRequest().hasRole("CUSTOMER"))
+          .authorizeHttpRequests(a->a
+              .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
+              .requestMatchers("/api/v1/admin/test-drives", "/api/v1/admin/test-drives/**").hasRole("ADMIN")
+              .requestMatchers(HttpMethod.POST, "/api/v1/test-drives").hasRole("CUSTOMER")
+              .requestMatchers(HttpMethod.GET, "/api/v1/test-drives/slots").permitAll()
+              .requestMatchers(HttpMethod.GET, "/api/v1/test-drives").hasRole("CUSTOMER")
+              .requestMatchers(HttpMethod.DELETE, "/api/v1/test-drives/**").hasRole("CUSTOMER")
+              .anyRequest().hasRole("CUSTOMER"))
           .addFilterBefore(new JwtAuthenticationFilter(jwt),UsernamePasswordAuthenticationFilter.class).build();
     }
     @Bean CorsConfigurationSource corsConfigurationSource(@Value("${app.cors.allowed-origins}")String origins){

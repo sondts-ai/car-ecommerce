@@ -19,7 +19,9 @@ public class JwtService {
         Object raw=claims.get("userId");
         if(!(raw instanceof Number id)||id.longValue()<=0)throw new IllegalArgumentException("JWT userId claim is missing");
         String role=claims.get("role",String.class);
-        if(!"CUSTOMER".equals(role))throw new IllegalArgumentException("CUSTOMER role is required");
+        if(role==null||role.isBlank())throw new IllegalArgumentException("JWT role claim is missing");
+        if(!"CUSTOMER".equals(role)&&!"ADMIN".equals(role))
+            throw new IllegalArgumentException("Unsupported role: "+role);
         String email=claims.getSubject();if(email==null||email.isBlank())throw new IllegalArgumentException("JWT subject is missing");
         return new OrderPrincipal(id.longValue(),email,role);
     }

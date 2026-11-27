@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { SiteHeader } from "@/components/layout/SiteHeader";
-import { SiteFooter } from "@/components/layout/SiteFooter";
 
 export const metadata: Metadata = {
   title: {
@@ -13,6 +11,13 @@ export const metadata: Metadata = {
   keywords: ["ô tô", "mua xe", "đặt cọc xe", "lái thử", "showroom", "AutoWeb"],
 };
 
+/**
+ * Root layout dùng chung cho toàn bộ ứng dụng (user + admin).
+ * Chỉ chứa <html>/<body>/font và metadata — không chứa header/footer.
+ *
+ * - Khu khách hàng: `app/(user)/layout.tsx` bọc SiteHeader + SiteFooter.
+ * - Khu quản trị:   `app/admin/layout.tsx` bọc AdminGuard + AdminShell.
+ */
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="vi">
@@ -24,11 +29,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           rel="stylesheet"
         />
       </head>
-      <body className="flex min-h-screen flex-col">
-        <SiteHeader />
-        <main className="flex-1">{children}</main>
-        <SiteFooter />
-      </body>
+      <body className="min-h-screen">{children}</body>
     </html>
   );
 }

@@ -1,54 +1,70 @@
-# Cấu trúc dự án — AutoWeb Customer (Next.js 15 + Tailwind CSS)
+# Cấu trúc dự án — AutoWeb (Next.js 15 + Tailwind CSS)
+
+Frontend gồm 2 khu tách biệt bằng route group:
+
+- **Khu khách hàng** — `app/(user)/…` + `components/site/…` (URL: `/`, `/cars`, `/login`…)
+- **Khu quản trị** — `app/admin/…` + `components/admin/…` (URL: `/admin`, `/admin/brands`…)
+
+Root layout chỉ giữ `html/body/font`; mỗi khu có layout riêng nên không còn
+header/footer khách hàng lẫn vào trang admin.
 
 ```
 AutoWeb/
 ├─ app/                              # Next.js App Router
-│  ├─ layout.tsx                     # Root layout: font, header, footer, metadata
+│  ├─ layout.tsx                     # Root layout: html/body/font (dùng chung user + admin)
 │  ├─ globals.css                    # Tailwind + design tokens (ink/champagne/cream)
-│  ├─ page.tsx                       # Trang chủ (hero, tìm kiếm nhanh, xe nổi bật…)
-│  ├─ cars/
-│  │  ├─ page.tsx                    # Danh sách xe + bộ lọc (đọc query ?q=&bodyType=…)
-│  │  └─ [slug]/
-│  │     ├─ page.tsx                 # Chi tiết xe + đánh giá + CTA đặt cọc/lái thử
-│  │     ├─ deposit/page.tsx         # Luồng đặt cọc (kiểm tra xe → thanh toán)
-│  │     └─ test-drive/page.tsx      # Luồng đặt lịch lái thử
-│  ├─ login/page.tsx                 # Đăng nhập
-│  ├─ register/page.tsx              # Đăng ký
-│  ├─ forgot-password/page.tsx       # Khôi phục mật khẩu (OTP 2 bước)
-│  └─ profile/page.tsx               # Hồ sơ: thông tin, đổi mật khẩu, đơn hàng
-│
-│  # Mock backend (Next.js Route Handlers, dữ liệu in-memory)
-├─ app/api/
-│  ├─ _lib/                          # store.ts, response.ts, validators.ts
-│  ├─ health/route.ts
-│  ├─ auth/{login,register,logout,forgot-password,verify-otp,reset-password,change-password}/route.ts
-│  ├─ customers/me/route.ts          # GET / PATCH hồ sơ
-│  ├─ cars/route.ts                  # Danh sách + lọc + phân trang
-│  ├─ cars/[slug]/{route.ts,availability/route.ts,reviews/route.ts}
-│  ├─ deposits/{route.ts,[id]/route.ts}
-│  ├─ payments/{intent,[id]/confirm}/route.ts
-│  └─ test-drives/{route.ts,slots/route.ts}
+│  ├─ not-found.tsx                  # 404 toàn cục
+│  │
+│  ├─ (user)/                        # Route group — URL không đổi (khu khách hàng)
+│  │  ├─ layout.tsx                  # SiteHeader + <main> + SiteFooter
+│  │  ├─ not-found.tsx               # 404 trong khu khách hàng
+│  │  ├─ page.tsx                    # Trang chủ (hero, tìm kiếm nhanh, xe nổi bật…)
+│  │  ├─ cars/
+│  │  │  ├─ page.tsx                 # Danh sách xe + bộ lọc (?q=&bodyType=…)
+│  │  │  └─ [slug]/
+│  │  │     ├─ page.tsx              # Chi tiết xe + đánh giá + CTA
+│  │  │     ├─ deposit/page.tsx      # Luồng đặt cọc
+│  │  │     └─ test-drive/page.tsx   # Luồng đặt lịch lái thử
+│  │  ├─ login/page.tsx              # Đăng nhập
+│  │  ├─ register/page.tsx           # Đăng ký
+│  │  ├─ forgot-password/page.tsx    # Khôi phục mật khẩu (OTP 2 bước)
+│  │  └─ profile/page.tsx            # Hồ sơ: thông tin, đổi mật khẩu, đơn hàng
+│  │
+│  ├─ admin/                         # Khu quản trị — URL /admin/*
+│  │  ├─ layout.tsx                  # AdminGuard (kiểm tra role ADMIN)
+│  │  ├─ login/page.tsx              # Đăng nhập admin (không bọc sidebar)
+│  │  ├─ page.tsx                    # Dashboard & thống kê
+│  │  ├─ brands/page.tsx
+│  │  ├─ categories/page.tsx
+│  │  ├─ car-models/page.tsx
+│  │  ├─ vehicles/{page.tsx,[id]/page.tsx}
+│  │  ├─ branches/page.tsx
+│  │  ├─ orders/page.tsx              # Quản lý đơn đặt cọc
+│  │  └─ test-drives/page.tsx         # Quản lý lịch lái thử
+│  │
+│  └─ api/                           # Mock backend (Next.js Route Handlers)
+│     ├─ _lib/                       # store.ts, admin-store.ts, response.ts, validators.ts
+│     ├─ health/route.ts
+│     ├─ auth/{login,register,logout,forgot-password,verify-otp,reset-password,change-password}/route.ts
+│     ├─ customers/me/route.ts
+│     ├─ cars/…, deposits/…, payments/…, test-drives/…
+│     └─ admin/…                      # Mock admin APIs (khi tắt backend thật)
 │
 ├─ components/
-│  ├─ layout/
-│  │  ├─ SiteHeader.tsx              # Header sticky, menu mobile
-│  │  └─ SiteFooter.tsx              # Footer 4 cột + newsletter
-│  ├─ cars/
-│  │  ├─ CarListView.tsx             # ★ Danh sách xe + tìm kiếm + bộ lọc + sort
-│  │  ├─ CarCard.tsx                 # Thẻ xe (ảnh, tên, giá, thông số)
-│  │  ├─ CarVisual.tsx               # Ảnh placeholder SVG (không phụ thuộc mạng)
-│  │  └─ ReviewSection.tsx           # Đánh giá sao + bình luận
-│  ├─ booking/
-│  │  ├─ DepositForm.tsx             # ★ Form đặt cọc 3 bước + kiểm tra tồn kho
-│  │  └─ TestDriveForm.tsx           # ★ Form đặt lịch lái thử
-│  ├─ auth/
-│  │  ├─ AuthShell.tsx               # Layout 2 cột dùng chung cho auth
-│  │  ├─ LoginForm.tsx
-│  │  ├─ RegisterForm.tsx
-│  │  └─ ForgotPasswordForm.tsx
-│  ├─ profile/
-│  │  └─ ProfileDashboard.tsx        # Tab thông tin / bảo mật / đơn hàng
-│  └─ ui/
+│  ├─ site/                          # UI khu khách hàng
+│  │  ├─ layout/
+│  │  │  ├─ SiteHeader.tsx           # Header sticky, menu mobile
+│  │  │  └─ SiteFooter.tsx           # Footer 4 cột + newsletter
+│  │  ├─ cars/                       # CarListView, CarCard, CarVisual, ReviewSection
+│  │  ├─ booking/                    # DepositForm, TestDriveForm
+│  │  ├─ auth/                       # AuthShell, LoginForm, RegisterForm, ForgotPasswordForm
+│  │  ├─ profile/                    # ProfileDashboard
+│  │  └─ NotFoundContent.tsx         # 404 dùng chung
+│  ├─ admin/                         # UI khu quản trị
+│  │  ├─ AdminGuard.tsx              # Chặn truy cập nếu không phải ADMIN
+│  │  ├─ AdminShell.tsx              # Sidebar + topbar
+│  │  └─ AdminUi.tsx                 # Modal, pagination, banner, format helpers
+│  └─ ui/                            # Component dùng chung
 │     ├─ icons.tsx                   # Bộ icon SVG nội bộ (không cần thư viện)
 │     └─ StarRating.tsx              # Hiển thị sao (hỗ trợ số lẻ)
 │
@@ -97,6 +113,8 @@ AutoWeb/
 | Đặt cọc + kiểm tra tình trạng xe | `/cars/[slug]/deposit` → `DepositForm` |
 | Thanh toán | `DepositForm` bước 2 (chọn phương thức + xác nhận) |
 | Đặt lịch lái thử | `/cars/[slug]/test-drive` → `TestDriveForm` |
+| Quản lý đơn đặt cọc | `/admin/orders` → Order Service / mock admin API |
+| Quản lý lịch lái thử | `/admin/test-drives` → Customer Service / mock admin API |
 
 ## Chạy dự án
 

@@ -10,6 +10,7 @@ import type {
   PaymentMethodId,
   TestDriveDto,
   TestDriveSlotsDto,
+  TestDriveStatus,
 } from "../types";
 
 export const depositsApi = {
@@ -109,7 +110,7 @@ export const paymentsApi = {
         transactionId: number;
         transactionCode: string;
         createdAt: string;
-      }>(`/payments/${paymentId}/confirm`, undefined, { baseUrl: API_CONFIG.services.payment });
+      }>(`/payments/${paymentId}/confirm`, { responseCode: "00" }, { baseUrl: API_CONFIG.services.payment });
       return mapPayment(data);
     }
     const { data } = await http.post<PaymentDto>(ENDPOINTS.payments.confirm(paymentId));
@@ -153,20 +154,73 @@ function mapPayment(payment: {
 export const testDrivesApi = {
   /** POST /test-drives */
   async create(payload: CreateTestDrivePayload): Promise<TestDriveDto> {
+    if (API_CONFIG.useBackendServices) {
+      const { data } = await http.post<BackendTestDriveDto>(
+        "/test-drives",
+        payload,
+        { baseUrl: API_CONFIG.services.customer },
+      );
+      return mapBackendTestDrive(data);
+    }
     const { data } = await http.post<TestDriveDto>(ENDPOINTS.testDrives.create, payload);
     return data;
   },
 
   /** GET /test-drives — cần đăng nhập */
   async list(): Promise<TestDriveDto[]> {
+    if (API_CONFIG.useBackendServices) {
+      const { data } = await http.get<
+        BackendTestDriveDto[] | { items: BackendTestDriveDto[] }
+      >("/test-drives", { baseUrl: API_CONFIG.services.customer });
+      return (Array.isArray(data) ? data : data.items).map(mapBackendTestDrive);
+    }
     const { data } = await http.get<{ items: TestDriveDto[] }>(ENDPOINTS.testDrives.list);
     return data.items;
+  },
+
+  /** DELETE /test-drives/{id} — hủy lịch của khách hiện tại */
+  async cancel(id: string): Promise<TestDriveDto> {
+    if (API_CONFIG.useBackendServices) {
+      const { data } = await http.delete<BackendTestDriveDto>(
+        `/test-drives/${encodeURIComponent(id)}`,
+        { baseUrl: API_CONFIG.services.customer },
+      );
+      return mapBackendTestDrive(data);
+    }
+    const { data } = await http.delete<TestDriveDto>(
+      `${ENDPOINTS.testDrives.create}/${encodeURIComponent(id)}`,
+    );
+    return data;
   },
 
   /** GET /test-drives/slots?carSlug=&showroomId=&date= */
   async slots(params: { carSlug: string; showroomId: string; date: string }): Promise<TestDriveSlotsDto> {
     const search = new URLSearchParams(params).toString();
-    const { data } = await http.get<TestDriveSlotsDto>(`${ENDPOINTS.testDrives.slots}?${search}`);
+    const { data } = await http.get<TestDriveSlotsDto>(
+      `${ENDPOINTS.testDrives.slots}?${search}`,
+      API_CONFIG.useBackendServices ? { baseUrl: API_CONFIG.services.customer } : undefined,
+    );
     return data;
   },
 };
+
+type BackendTestDriveDto = Omit<TestDriveDto, "id" | "status"> & {
+  id: number | string;
+  status: "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED" | "REJECTED";
+};
+
+const TEST_DRIVE_STATUS_MAP: Record<BackendTestDriveDto["status"], TestDriveStatus> = {
+  PENDING: "pending",
+  CONFIRMED: "confirmed",
+  COMPLETED: "completed",
+  CANCELLED: "cancelled",
+  REJECTED: "rejected",
+};
+
+function mapBackendTestDrive(item: BackendTestDriveDto): TestDriveDto {
+  return {
+    ...item,
+    id: String(item.id),
+    status: TEST_DRIVE_STATUS_MAP[item.status],
+  };
+}

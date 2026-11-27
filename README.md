@@ -7,7 +7,7 @@ Spring Boot theo kiến trúc microservices.
 
 | Thành phần | Thư mục | Cổng mặc định |
 |---|---|---:|
-| Frontend khách hàng | `app/`, `components/`, `lib/` | 3000 |
+| Frontend khách hàng + Admin UI (`/admin`) | `app/`, `components/`, `lib/` | 3000 |
 | Auth Service | `auth-service/` | 8081 |
 | Customer Service | `customer-service/` | 8082 |
 | Order Service | `order-service/` | 8083 |
@@ -47,11 +47,19 @@ Frontend gọi các backend qua API Gateway/Nginx bằng các biến
 mặc định là `true`; frontend tự gắn JWT và chuyển đổi response DTO của Spring
 Boot sang kiểu dữ liệu giao diện.
 
-Các luồng chưa có backend tương ứng (danh mục xe công khai, lái thử,
-OTP/quên mật khẩu) vẫn dùng mock API tại `/api`. Luồng đặt cọc thật tạo order
-qua Order Service, tạo intent và xác nhận qua Payment Service; sau khi confirm,
-Order Service chuyển trạng thái sang `DEPOSIT_PAID`. Người dùng cần đăng nhập
-trước khi đặt cọc.
+`.env.example` mặc định trỏ tới gateway `http://localhost:8080/api/v1` (backend
+chạy bằng Docker). Nếu chạy từng service bằng `mvn spring-boot:run`, dùng các
+URL cổng trực tiếp đã ghi chú sẵn trong file.
+
+Admin UI nằm trong cùng app Next.js tại `/admin` (đăng nhập bằng tài khoản
+`ADMIN`). Trang quản trị quản lý danh mục, kho xe, đơn đặt cọc qua Order
+Service và lịch lái thử qua Customer Service; không cần build frontend riêng.
+
+Các luồng chưa có backend tương ứng (danh mục xe công khai,
+OTP/quên mật khẩu) vẫn dùng mock API tại `/api`. Đơn đặt cọc thật được lưu
+trong Order Service; sau khi thanh toán thành công, Admin có thể xác nhận đơn.
+Người dùng cần đăng nhập trước khi đặt cọc; đặt lịch lái thử vẫn cho phép khách
+vãng lai nhập thông tin liên hệ.
 Khi cần chạy hoàn toàn bằng mock, đặt
 `NEXT_PUBLIC_USE_BACKEND_SERVICES=false`.
 

@@ -16,7 +16,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter{
         String header=request.getHeader("Authorization");
         if(header!=null&&header.startsWith("Bearer "))try{
             OrderPrincipal principal=jwt.verify(header.substring(7).trim());
-            SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(principal,null,List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER"))));
+            SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(principal,null,List.of(new SimpleGrantedAuthority("ROLE_"+principal.role()))));
         }catch(RuntimeException invalid){SecurityContextHolder.clearContext();}
         chain.doFilter(request,response);
     }

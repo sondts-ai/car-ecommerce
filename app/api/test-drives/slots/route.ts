@@ -32,7 +32,8 @@ export async function GET(request: Request) {
           item.carSlug === carSlug &&
           item.showroomId === showroomId &&
           item.date === date &&
-          item.status !== "cancelled",
+          item.status !== "cancelled" &&
+          item.status !== "rejected",
       )
       .map((item) => item.time),
   );

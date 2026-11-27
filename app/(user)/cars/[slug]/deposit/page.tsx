@@ -1,0 +1,54 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { CARS, getCarBySlug } from "@/lib/cars";
+import { DepositForm } from "@/components/site/booking/DepositForm";
+import { CheckIcon } from "@/components/ui/icons";
+
+type PageProps = { params: Promise<{ slug: string }> };
+
+export function generateStaticParams() {
+  return CARS.map((car) => ({ slug: car.slug }));
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const car = getCarBySlug(slug);
+  return { title: car ? `Đặt cọc ${car.name}` : "Đặt cọc xe" };
+}
+
+export default async function DepositPage({ params }: PageProps) {
+  const { slug } = await params;
+  const car = getCarBySlug(slug);
+  if (!car) notFound();
+
+  return (
+    <>
+      <div className="border-b border-cream-200 bg-white/70">
+        <div className="container-luxe flex flex-wrap items-center justify-between gap-3 py-4">
+          <div className="flex items-center gap-2 text-[11px] text-ink-600/60">
+            <Link href="/cars" className="hover:text-ink-950">
+              Bộ sưu tập xe
+            </Link>
+            <span aria-hidden>/</span>
+            <Link href={`/cars/${car.slug}`} className="hover:text-ink-950">
+              {car.name}
+            </Link>
+            <span aria-hidden>/</span>
+            <span className="text-ink-900">Đặt cọc</span>
+          </div>
+          <div className="flex items-center gap-4 text-[11px] text-ink-600/65">
+            <span className="inline-flex items-center gap-1.5">
+              <CheckIcon className="h-3.5 w-3.5 text-emerald-500" strokeWidth={3} /> Hoàn cọc 48 giờ
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <CheckIcon className="h-3.5 w-3.5 text-emerald-500" strokeWidth={3} /> Bảo mật SSL
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <DepositForm car={car} />
+    </>
+  );
+}

@@ -43,8 +43,8 @@ pipeline {
         )
         booleanParam(
             name: 'USE_MOCK_API',
-            defaultValue: false,
-            description: 'Bật mock API trong bundle frontend'
+            defaultValue: true,
+            description: 'Bật mock API trong bundle frontend (nên bật: catalog/lái thử/OTP vẫn dùng mock)'
         )
         booleanParam(
             name: 'PUSH_IMAGES',
@@ -65,6 +65,11 @@ pipeline {
             name: 'DEPLOY_HOST',
             defaultValue: '',
             description: 'IP hoặc DNS của EC2'
+        )
+        string(
+            name: 'DEPLOY_PATH',
+            defaultValue: '/opt/car-ecommerce',
+            description: 'Thư mục repo trên EC2 (chứa docker-compose.yml + scripts/deploy.sh)'
         )
         string(
             name: 'PUBLIC_URL',
@@ -143,6 +148,8 @@ pipeline {
                                 --build-arg NEXT_PUBLIC_AUTH_API_URL=${env.API_BASE} \
                                 --build-arg NEXT_PUBLIC_CUSTOMER_API_URL=${env.API_BASE} \
                                 --build-arg NEXT_PUBLIC_ORDER_API_URL=${env.API_BASE} \
+                                --build-arg NEXT_PUBLIC_ADMIN_CAR_API_URL=${env.API_BASE} \
+                                --build-arg NEXT_PUBLIC_ADMIN_INVENTORY_API_URL=${env.API_BASE} \
                                 --build-arg NEXT_PUBLIC_PAYMENT_API_URL=${env.API_BASE} \
                                 .
                         """
@@ -199,7 +206,7 @@ pipeline {
                 sshagent([env.SSH_CREDENTIALS]) {
                     sh """
                         ssh -o StrictHostKeyChecking=accept-new ${params.DEPLOY_USER}@${params.DEPLOY_HOST} \\
-                            'cd /opt/car-ecommerce && IMAGE_TAG=${env.IMAGE_TAG} ./scripts/deploy.sh'
+                            'cd ${params.DEPLOY_PATH} && IMAGE_TAG=${env.IMAGE_TAG} ./scripts/deploy.sh'
                     """
                 }
             }

@@ -1,6 +1,6 @@
 # Trạng thái dự án — Car E-commerce
 
-Cập nhật: 2026-11-22. Tài liệu này mô tả **cái gì chạy thật, cái gì còn mock**, và
+Cập nhật: 2026-11-27. Tài liệu này mô tả **cái gì chạy thật, cái gì còn mock**, và
 những việc còn lại. Dùng để báo cáo / bàn giao.
 
 ---
@@ -21,9 +21,10 @@ những việc còn lại. Dùng để báo cáo / bàn giao.
 | Docker image + compose + healthcheck | ✅ |
 | Jenkins CI (build/test/push) | ✅ |
 | Deploy EC2 | ⏳ chờ môi trường (code + script đã sẵn) |
-| UI admin | ❌ chưa làm |
+| UI admin (dashboard, catalog, inventory, deposits, test drives) | ✅ Next.js `/admin` |
 | Catalog xe công khai | ⚠️ **mock** |
-| Lái thử / đánh giá / quên mật khẩu | ⚠️ **mock** |
+| Lái thử | ✅ Customer Service + `customer_db` persistence |
+| Đánh giá / quên mật khẩu | ⚠️ **mock** |
 
 ---
 
@@ -39,12 +40,14 @@ những việc còn lại. Dùng để báo cáo / bàn giao.
 | Đặt cọc | ✅ Order Service + Payment Service |
 | Thanh toán | ✅ Payment Service (mô phỏng gateway) |
 | Lịch sử đơn hàng | ✅ Order Service |
-| Đặt lái thử | ⚠️ Mock `app/api/test-drives` |
+| Đặt lái thử | ✅ Customer Service; guest bookings supported |
 | Quên mật khẩu / OTP | ⚠️ Mock `app/api/auth/*` |
-| Admin CRUD xe | ✅ car-service + inventory-service (qua API, chưa có UI) |
+| Admin quản lý đơn cọc | ✅ Order Service list/status API + UI `/admin/orders` |
+| Admin duyệt / từ chối lịch lái thử | ✅ Customer Service status API + UI `/admin/test-drives` |
+| Admin CRUD xe | ✅ car-service + inventory-service + UI `/admin` |
 
-> Vì vậy **không đặt `NEXT_PUBLIC_USE_MOCK_API=false`** cho tới khi thay các luồng
-> mock ở trên bằng backend thật.
+> Catalog xe công khai, đánh giá và OTP vẫn dùng mock; luồng lái thử đã được
+> chuyển sang Customer Service và lưu bền vững trong `customer_db`.
 
 ---
 
@@ -77,8 +80,8 @@ những việc còn lại. Dùng để báo cáo / bàn giao.
    - Ghi `order_db.vehicle_reservations` (bảng đã có) và job hết hạn.
    - Hiện `POST /me/orders` đang tin dữ liệu client gửi lên.
 
-3. **Lái thử + đánh giá**
-   - Cần bảng `test_drives` và bảng `reviews` (xem `customer-service/proposals/reviews_schema.sql`).
+3. **Đánh giá xe**
+   - Cần bảng reviews (xem `customer-service/proposals/reviews_schema.sql`).
    - Hiện frontend dùng mock.
 
 ### P1 — có thể ghi “ngoài phạm vi”
@@ -87,7 +90,7 @@ những việc còn lại. Dùng để báo cáo / bàn giao.
 5. Payment gateway thật (VNPay/MoMo): cần callback + xác thực chữ ký; hiện confirm mô phỏng.
 6. ~~Payment Service chưa xác thực JWT/ownership~~ — đã sửa: yêu cầu JWT CUSTOMER và kiểm tra customer profile + ownership order.
 7. Test tích hợp toàn bộ 6 service với MySQL thật (hiện test dùng H2).
-8. UI admin.
+8. ~~UI admin~~ — đã hoàn thành (2026-11-27): dashboard, CRUD, đơn cọc và lịch lái thử tại `/admin`.
 
 ---
 
@@ -131,9 +134,10 @@ Tài khoản seed: `admin@carsales.vn` / `Admin@123`, `customer@carsales.vn` / `
 
 ---
 
-## 7. Kết quả kiểm chứng gần nhất (2026-11-22)
+## 7. Kết quả kiểm chứng gần nhất (2026-11-27)
 
-Đã build lại toàn bộ image và chạy `docker compose up -d`, tất cả 9 container **healthy**:
+Đã build lại toàn bộ image và chạy `docker compose up -d --wait`, tất cả 9 container **healthy**.
+Frontend build ra 40 route, bao gồm toàn bộ `/admin/*`.
 
 | Kiểm tra | Kết quả |
 |---|---|
@@ -145,8 +149,10 @@ Tài khoản seed: `admin@carsales.vn` / `Admin@123`, `customer@carsales.vn` / `
 | `GET :8080/api/v1/me/internal/...` qua gateway | 404 (đã chặn) |
 | Đăng ký tài khoản mới rồi `GET /api/v1/customers/me` | 201 → 200, profile tự tạo |
 | `GET :3000/api/health` + `GET :3000/api/cars` | 200, trả dữ liệu mock |
+| `GET :3000/admin/login` | 200 |
+| Docker build frontend | 40 route, gồm `/admin`, `/admin/vehicles`, `/admin/car-models`... |
 | `mvn test` auth-service | 6/6 pass |
-| `npm run typecheck` | pass |
+| `npm run typecheck` (trong Docker build) | pass |
 | `nginx -t`, `docker compose config` (+ prod overlay) | pass |
 
 > Lưu ý cho người làm admin UI: các API danh sách dùng `page` **bắt đầu từ 0**

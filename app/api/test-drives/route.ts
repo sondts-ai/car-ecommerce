@@ -19,12 +19,12 @@ export async function GET(request: Request) {
   await latency(160, 280);
   const user = getAuthUser(request);
   if (!user) return fail(401, "UNAUTHORIZED", "Bạn cần đăng nhập để xem lịch hẹn.");
+  if (user.role !== "CUSTOMER") return fail(403, "FORBIDDEN", "Chỉ khách hàng mới được quản lý lịch hẹn.");
 
   const items = store.testDrives
     .filter(
       (item) =>
-        item.customer.email?.toLowerCase() === user.email.toLowerCase() ||
-        item.customer.phone === user.phone,
+        store.testDriveOwners.get(item.id) === user.id,
     )
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 
@@ -34,6 +34,9 @@ export async function GET(request: Request) {
 /** POST /api/test-drives — UC: Đặt lịch lái thử */
 export async function POST(request: Request) {
   await latency(320, 520);
+  const user = getAuthUser(request);
+  if (!user) return fail(401, "UNAUTHORIZED", "Bạn cần đăng nhập để đặt lịch và theo dõi lịch hẹn.");
+  if (user.role !== "CUSTOMER") return fail(403, "FORBIDDEN", "Chỉ khách hàng mới được đặt lịch lái thử.");
   const body = await parseBody<CreateTestDrivePayload>(request);
   if (!body) return validationError({}, "Body JSON không hợp lệ.");
 
@@ -71,7 +74,8 @@ export async function POST(request: Request) {
       item.showroomId === body.showroomId &&
       item.date === body.date &&
       item.time === body.time &&
-      item.status !== "cancelled",
+      item.status !== "cancelled" &&
+      item.status !== "rejected",
   );
   if (conflict || isSlotUnavailable(body.date, body.time, body.showroomId)) {
     return fail(409, "CONFLICT", "Khung giờ này đã được đặt. Vui lòng chọn giờ khác.", {
@@ -98,5 +102,6 @@ export async function POST(request: Request) {
   };
 
   store.testDrives.unshift(testDrive);
-  return created(testDrive, "Đã giữ lịch lái thử cho bạn.");
+  store.testDriveOwners.set(testDrive.id, user.id);
+  return created(testDrive, "Yêu cầu lái thử đã gửi, đang chờ Admin xác nhận.");
 }

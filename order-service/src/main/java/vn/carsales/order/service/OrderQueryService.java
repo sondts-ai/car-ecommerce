@@ -57,6 +57,35 @@ public class OrderQueryService {
         return owned.stream().map(order->orderView(order,items.getOrDefault(order.getId(),List.of()))).toList();
     }
     @Transactional(readOnly=true)
+    public List<AdminOrderView> adminOrders(){
+        List<CustomerOrder> all=orders.findAllByOrderByCreatedAtDesc();
+        if(all.isEmpty())return List.of();
+        List<Long> ids=all.stream().map(CustomerOrder::getId).toList();
+        Map<Long,List<OrderItemView>> items=orderItems.findAllByOrderIdInOrderByIdAsc(ids).stream()
+                .collect(Collectors.groupingBy(OrderItem::getOrderId,LinkedHashMap::new,Collectors.mapping(this::itemView,Collectors.toList())));
+        return all.stream().map(order->adminOrderView(order,items.getOrDefault(order.getId(),List.of()))).toList();
+    }
+    @Transactional
+    public void updateAdminOrderStatus(Long orderId,OrderStatus nextStatus,String note,Long adminUserId){
+        CustomerOrder order=orders.findById(orderId)
+                .orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Order not found"));
+        OrderStatus current=order.getStatus();
+        if(current==nextStatus)return;
+        boolean allowed=(current==OrderStatus.PENDING_DEPOSIT&&nextStatus==OrderStatus.CANCELLED)
+                ||(current==OrderStatus.DEPOSIT_PAID&&nextStatus==OrderStatus.CONFIRMED);
+        if(!allowed)throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Order status cannot be changed from "+current+" to "+nextStatus);
+        order.setStatus(nextStatus);
+        orders.save(order);
+        OrderStatusHistory change=new OrderStatusHistory();
+        change.setOrderId(orderId);
+        change.setOldStatus(current);
+        change.setNewStatus(nextStatus);
+        change.setNote(note.trim());
+        change.setChangedBy(adminUserId);
+        history.save(change);
+    }
+    @Transactional(readOnly=true)
     public OrderView getOrder(Long userId,String token,Long orderId){
         Long customerId=customerIdentity.customerId(userId,token);CustomerOrder order=ownedOrder(orderId,customerId);
         return orderView(order,orderItems.findAllByOrderIdOrderByIdAsc(orderId).stream().map(this::itemView).toList());
@@ -106,4 +135,5 @@ public class OrderQueryService {
     private CartView cartView(Cart c,List<CartItem> items){return new CartView(c.getId(),c.getStatus(),c.getCreatedAt(),c.getUpdatedAt(),items.stream().map(i->new CartItemView(i.getVehicleId(),i.getAddedAt())).toList());}
     private OrderItemView itemView(OrderItem i){return new OrderItemView(i.getVehicleId(),i.getVehicleName(),i.getVin(),i.getPrice());}
     private OrderView orderView(CustomerOrder o,List<OrderItemView> items){return new OrderView(o.getId(),o.getOrderCode(),o.getSubtotal(),o.getTotalAmount(),o.getDepositAmount(),o.getRemainingAmount(),o.getStatus(),o.getReservedUntil(),o.getNote(),o.getCreatedAt(),o.getUpdatedAt(),items);}
+    private AdminOrderView adminOrderView(CustomerOrder o,List<OrderItemView> items){return new AdminOrderView(o.getId(),o.getOrderCode(),o.getCustomerId(),o.getSubtotal(),o.getTotalAmount(),o.getDepositAmount(),o.getRemainingAmount(),o.getStatus(),o.getReservedUntil(),o.getNote(),o.getCreatedAt(),o.getUpdatedAt(),items);}
 }

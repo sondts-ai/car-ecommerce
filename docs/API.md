@@ -243,14 +243,15 @@ Trả về `DepositDto` gồm `id`, `code` (`DC-YYYYMMDD-XXXX`), `status: "pendi
 { "depositId": "dep_xxx", "method": "vnpay" }   // vnpay | visa | transfer | showroom
 ```
 
-Intent trả `QRCode`/`redirectUrl` cho VNPAY. Confirm chuyển payment → `succeeded`, deposit → `paid`, gia hạn `holdUntil` 15 ngày.
+Ở chế độ demo, không kết nối cổng/không trừ tiền: bấm xác nhận sẽ đánh dấu payment `succeeded`, cập nhật đơn sang `DEPOSIT_PAID` và gia hạn giữ xe. Intent hiện có được dùng lại khi khách thử thanh toán lại.
 
 ### 4.7 Test drives
 
 | Method | Path | Mô tả | Auth |
 | --- | --- | --- | --- |
 | GET | `/test-drives` | Lịch lái thử của khách | ✓ |
-| POST | `/test-drives` | Đặt lịch (guest được phép) | — |
+| POST | `/test-drives` | Gửi yêu cầu lịch hẹn, cần đăng nhập để theo dõi | ✓ |
+| DELETE | `/test-drives/{id}` | Khách hủy lịch của mình khi đang chờ hoặc đã xác nhận | ✓ |
 | GET | `/test-drives/slots?carSlug=&showroomId=&date=` | Khung giờ trống theo ngày | — |
 
 ```json
@@ -258,7 +259,7 @@ Intent trả `QRCode`/`redirectUrl` cho VNPAY. Confirm chuyển payment → `suc
 {
   "carSlug": "vinfast-vf-9-plus",
   "showroomId": "hcm-q7",
-  "date": "2026-11-20",
+  "date": "2026-11-28",
   "time": "14:30",
   "hasLicense": true,
   "note": "Muốn chạy thử cao tốc",
@@ -266,8 +267,27 @@ Intent trả `QRCode`/`redirectUrl` cho VNPAY. Confirm chuyển payment → `suc
 }
 ```
 
-Ràng buộc: ngày trong 30 ngày tới, `time` thuộc `TEST_DRIVE_SLOTS`, khung giờ chưa bị đặt (`409 CONFLICT`).
+Ràng buộc: ngày trong 30 ngày tới, `time` thuộc `TEST_DRIVE_SLOTS`, khung giờ chưa bị đặt (`409 CONFLICT`). Lịch tạo mới ở trạng thái `PENDING` và chưa được xác nhận cho đến khi Admin đồng ý.
 Trả về `TestDriveDto` với `code` dạng `TD-YYYYMMDD-XXXX`.
+
+Khi `NEXT_PUBLIC_USE_BACKEND_SERVICES=true`, lịch của khách được lưu bền vững qua Customer Service; khung giờ khả dụng được đối chiếu với lịch đã đặt trong database. Cần đăng nhập để tạo, theo dõi và hủy lịch. Khi chạy mock, các route `/api/test-drives` vẫn dùng dữ liệu in-memory.
+
+### 4.8 Admin quản lý đơn cọc và lịch lái thử
+
+Các endpoint dưới đây yêu cầu JWT có role `ADMIN`.
+
+| Method | Path | Mô tả |
+| --- | --- | --- |
+| GET | `/admin/orders` | Danh sách đơn cọc và xe trong đơn |
+| PUT | `/admin/orders/{id}/status` | Xác nhận đơn đã đặt cọc hoặc hủy đơn chưa thanh toán |
+| GET | `/admin/test-drives` | Danh sách lịch lái thử toàn hệ thống |
+| PUT | `/admin/test-drives/{id}/status` | Đồng ý (`CONFIRMED`), từ chối (`REJECTED`), hoàn tất hoặc hủy lịch |
+
+Order Service chỉ cho phép `PENDING_DEPOSIT → CANCELLED` và
+`DEPOSIT_PAID → CONFIRMED`; xác nhận thanh toán vẫn do Payment Service thực hiện.
+Test drive cho phép Admin chuyển `PENDING → CONFIRMED/REJECTED` và
+`CONFIRMED → COMPLETED/CANCELLED`. Trạng thái kết thúc không thể đổi tiếp.
+Khách có thể tự hủy lịch của mình khi ở trạng thái `PENDING` hoặc `CONFIRMED`.
 
 ---
 
@@ -366,7 +386,8 @@ curl -X POST http://localhost:3000/api/payments/intent \
 curl -X POST http://localhost:3000/api/payments/<paymentId>/confirm
 
 # 7. Khung giờ lái thử
-curl "http://localhost:3000/api/test-drives/slots?carSlug=vinfast-vf-9-plus&showroomId=hcm-q7&date=2026-11-20"
+TEST_DATE=$(date -d '+1 day' +%F)
+curl "http://localhost:3000/api/test-drives/slots?carSlug=vinfast-vf-9-plus&showroomId=hcm-q7&date=${TEST_DATE}"
 
 # 8. Hồ sơ (thay <token> lấy từ bước 2)
 curl http://localhost:3000/api/customers/me -H "Authorization: Bearer <token>"
